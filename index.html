@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
-<meta name="format-detection" content="telephone=no">
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
 <meta name="theme-color" content="#f5f0e8">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -21,173 +20,160 @@
     --green: #3d6b4f;
     --red: #8b2e2e;
     --shadow: rgba(26,20,16,0.12);
-
-    /* Insets seguros (notch / Dynamic Island / barra de gestos) */
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-right: env(safe-area-inset-right, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
     --safe-left: env(safe-area-inset-left, 0px);
-
-    /* Layout responsivo — definidas/atualizadas pelo JS de auto-redimensionamento */
-    --bar-h: 0px;                              /* altura real da barra de progresso */
-    --pad-v: clamp(0.7rem, 2vh, 1.25rem);      /* padding vertical do painel */
-    --pad-h: clamp(0.75rem, 4vw, 1.5rem);      /* padding horizontal do painel */
-    --maxw: 600px;                             /* largura máxima do conteúdo */
+    --bar-h: 0px;
+    --maxw: 600px;
   }
 
-  * {
-    box-sizing: border-box; margin: 0; padding: 0;
-    -webkit-tap-highlight-color: transparent;   /* sem flash de toque no mobile */
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
-  /* O documento é o contentor de scroll, com snap obrigatório por painel */
-  html {
-    scroll-snap-type: y mandatory;
-    scroll-behavior: smooth;
-    scroll-padding-top: 0;
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;             /* NADA faz scroll excepto #snap-root */
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
-    overscroll-behavior-y: none;               /* evita pull-to-refresh/bounce a lutar com o snap */
+    background: var(--cream);
   }
 
   body {
-    background: var(--cream);
-    color: var(--ink);
     font-family: 'Cormorant Garamond', Georgia, serif;
-    min-height: 100vh;
-    overflow-x: hidden;
+    color: var(--ink);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
-  @supports (min-height: 100svh) { body { min-height: 100svh; } }
 
+  /* Gradiente de fundo fixo */
   body::before {
     content: '';
-    position: fixed;
-    inset: 0;
+    position: fixed; inset: 0;
     background:
       radial-gradient(ellipse at 20% 10%, rgba(201,168,76,0.08) 0%, transparent 50%),
       radial-gradient(ellipse at 80% 90%, rgba(139,111,71,0.07) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 0;
+    pointer-events: none; z-index: 0;
   }
 
-  /* Aparência neutra de inputs/botões em iOS e Android */
   input, textarea {
-    -webkit-appearance: none; appearance: none;
-    border-radius: 0;
+    -webkit-appearance: none; appearance: none; border-radius: 0;
   }
 
-  /* ───────────────────────────────────────────────
-     PAINÉIS DE SCROLL (cada etapa = 1 ecrã centrado)
-     ─────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════
+     CONTENTOR DE SNAP — único elemento que faz scroll
+     ═══════════════════════════════════════════════ */
+  #snap-root {
+    position: fixed;
+    inset: 0;
+    overflow-y: scroll;
+    overflow-x: hidden;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: none;
+    z-index: 1;
+    /* scrollbar invisível */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #snap-root::-webkit-scrollbar { display: none; }
+
+  /* ═══════════════════════════════════════════════
+     PAINÉIS
+     ═══════════════════════════════════════════════ */
   .panel {
     position: relative;
     width: 100%;
-    height: 100vh;                 /* fallback */
+    height: 100vh; height: 100svh;
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    padding: var(--pad-v) var(--pad-h);
-    padding-top: calc(var(--bar-h) + var(--pad-v));   /* reserva a barra de progresso (já inclui safe-top) */
-    padding-bottom: calc(var(--pad-v) + var(--safe-bottom));
-    padding-left: calc(var(--pad-h) + var(--safe-left));
-    padding-right: calc(var(--pad-h) + var(--safe-right));
+    padding: calc(var(--bar-h) + clamp(0.7rem,2vh,1.25rem)) clamp(0.75rem,4vw,1.5rem) calc(clamp(0.7rem,2vh,1.25rem) + var(--safe-bottom));
+    padding-left:  calc(clamp(0.75rem,4vw,1.5rem) + var(--safe-left));
+    padding-right: calc(clamp(0.75rem,4vw,1.5rem) + var(--safe-right));
     scroll-snap-align: start;
     scroll-snap-stop: always;
     z-index: 1;
-    overflow: hidden;              /* o auto-redimensionamento garante que o conteúdo cabe */
+    /* transição de opacidade ao desbloquear */
+    transition: opacity 0.35s ease;
   }
-  @supports (height: 100svh) { .panel { height: 100svh; } }
 
-  .panel.locked { display: none; }
+  /* Painel bloqueado: invisível mas OCUPA ESPAÇO (snap não quebra) */
+  .panel.locked {
+    pointer-events: none;
+    opacity: 0;
+    /* impede o utilizador de ver conteúdo bloqueado ao deslizar rápido */
+    visibility: hidden;
+  }
+
+  .panel.reveal { animation: fadeUp 0.45s ease both; }
+
   .panel-inner { width: 100%; max-width: var(--maxw); }
-  .panel.reveal .panel-inner { animation: fadeUp 0.5s ease both; }
 
-  /* Alvos do auto-redimensionamento (escalados via transform pelo JS).
-     Escalamos .block / .welcome-inner — nunca .panel-inner — para não colidir
-     com a animação de entrada (fadeUp) que assenta em .panel-inner. */
   .block, .welcome-inner {
     transform-origin: center center;
     backface-visibility: hidden;
   }
 
-  /* Fallback: se o conteúdo não couber nem à escala mínima, rola dentro do painel */
+  /* Fallback: conteúdo demasiado alto → scroll interno no painel */
   .panel.scrollable {
     justify-content: flex-start;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    /* scroll interno não pode ativar o snap do contentor pai */
+    overscroll-behavior: contain;
   }
-  /* Com o teclado aberto desligamos o snap para o campo focado subir livremente */
-  html.kb-open { scroll-snap-type: none; }
 
-  /* Durante a edição de um campo, o painel passa a cobrir o ecrã e rola
-     internamente: não se vê o painel anterior e a página (documento) não
-     faz scroll. Topo e altura são ajustados via JS (visualViewport). */
-  .panel.editing {
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes spin   { to { transform: rotate(360deg); } }
+
+  /* ═══════════════════════════════════════════════
+     OVERLAY DE FORMULÁRIO (abre sobre tudo quando o teclado está activo)
+     Separado do snap-root — não interfere com snap
+     ═══════════════════════════════════════════════ */
+  #form-overlay {
     position: fixed;
-    left: 0; right: 0;
-    top: 0;
-    height: 100vh;                 /* fallback — ajustado via JS */
-    z-index: 45;                   /* abaixo da barra de progresso (50) */
+    inset: 0;
+    z-index: 60;
     background: var(--cream);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;  /* o scroll interno não passa para o documento */
+    overscroll-behavior: contain;
+    display: none;                /* activado só pelo JS quando teclado abre */
+    flex-direction: column;
+    align-items: center;
     justify-content: flex-start;
-    scroll-snap-align: none;
+    padding: calc(var(--bar-h) + clamp(0.7rem,2vh,1.25rem)) clamp(0.75rem,4vw,1.5rem) calc(clamp(0.7rem,2vh,1.25rem) + var(--safe-bottom));
+    padding-left:  calc(clamp(0.75rem,4vw,1.5rem) + var(--safe-left));
+    padding-right: calc(clamp(0.75rem,4vw,1.5rem) + var(--safe-right));
   }
-  @supports (height: 100svh) { .panel.editing { height: 100svh; } }
-
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
-
-  @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  #form-overlay.active { display: flex; }
+  /* o conteúdo real do form fica em pForm — o overlay mostra uma cópia do bloco via JS */
 
   /* ── PÁGINA INICIAL ── */
   .panel-welcome {
     text-align: center;
     display: grid;
     grid-template-rows: 1fr auto 1fr;
-    padding: 2rem 1rem;
+    padding: 2rem clamp(1rem,4vw,1.5rem);
     padding-top: calc(2rem + var(--safe-top));
     padding-bottom: calc(2rem + var(--safe-bottom));
-    padding-left: calc(1rem + var(--safe-left));
-    padding-right: calc(1rem + var(--safe-right));
+    padding-left:  calc(clamp(1rem,4vw,1.5rem) + var(--safe-left));
+    padding-right: calc(clamp(1rem,4vw,1.5rem) + var(--safe-right));
   }
-  /* welcome-inner fica na linha central, verdadeiramente centrado */
-  .panel-welcome .welcome-inner {
-    grid-row: 2;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    align-self: center;
-    justify-self: center;
-    width: 100%;
-  }
-  /* scroll-cue ancora no fundo do grid */
-  .panel-welcome .scroll-cue {
-    grid-row: 3;
-    align-self: end;
-    justify-self: center;
-    padding-bottom: 2.5rem;
-  }
-  /* espaçador invisible que ocupa a 1ª linha */
-  .panel-welcome::before {
-    content: '';
-    grid-row: 1;
-  }
-  .panel-welcome::after {
-    content: '';
-    position: absolute; inset: 0;
-    background:
-      radial-gradient(ellipse at 25% 20%, rgba(201,168,76,0.12) 0%, transparent 55%),
-      radial-gradient(ellipse at 75% 85%, rgba(139,111,71,0.10) 0%, transparent 55%);
+  .panel-welcome .welcome-inner { grid-row: 2; display: flex; flex-direction: column; align-items: center; align-self: center; justify-self: center; width: 100%; }
+  .panel-welcome .scroll-cue    { grid-row: 3; align-self: end; justify-self: center; padding-bottom: 2.5rem; }
+  .panel-welcome::before { content: ''; grid-row: 1; }
+  .panel-welcome::after  {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 25% 20%, rgba(201,168,76,0.12) 0%, transparent 55%),
+                radial-gradient(ellipse at 75% 85%, rgba(139,111,71,0.10) 0%, transparent 55%);
     pointer-events: none; z-index: -1;
   }
   .welcome-inner { max-width: 540px; width: 100%; }
 
   /* ── Branding ── */
   .brand-name {
-    font-family: 'DM Mono', monospace; font-size: clamp(1rem, 4vw, 1.35rem);
+    font-family: 'DM Mono', monospace; font-size: clamp(1rem,4vw,1.35rem);
     letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink);
     font-weight: 400; margin-bottom: 0.9rem;
     opacity: 0; animation: fadeUp 0.8s 0.1s ease both;
@@ -195,7 +181,7 @@
   .brand-services {
     display: flex; flex-wrap: wrap; justify-content: center;
     gap: 0.3rem 0;
-    font-family: 'DM Mono', monospace; font-size: clamp(0.52rem, 1.8vw, 0.65rem);
+    font-family: 'DM Mono', monospace; font-size: clamp(0.52rem,1.8vw,0.65rem);
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--warm);
     opacity: 0; animation: fadeUp 0.8s 0.22s ease both;
     max-width: 400px; margin: 0 auto;
@@ -208,7 +194,7 @@
     margin-bottom: 1.5rem; opacity: 0; animation: fadeUp 0.8s 0.1s ease both;
   }
   .welcome-inner h1 {
-    font-size: clamp(2.8rem, 9vw, 4.6rem); font-weight: 300;
+    font-size: clamp(2.8rem,9vw,4.6rem); font-weight: 300;
     letter-spacing: 0.02em; line-height: 1.05; color: var(--ink);
     opacity: 0; animation: fadeUp 0.8s 0.38s ease both;
   }
@@ -224,35 +210,27 @@
     display: flex; flex-direction: column; align-items: center; gap: 0.55rem;
     color: var(--warm); opacity: 0; animation: fadeUp 0.8s 0.7s ease both;
   }
-  .scroll-cue .txt {
-    font-family: 'DM Mono', monospace; font-size: 0.6rem;
-    letter-spacing: 0.25em; text-transform: uppercase;
-  }
+  .scroll-cue .txt  { font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.25em; text-transform: uppercase; }
   .scroll-cue .chev { font-size: 1.4rem; line-height: 1; animation: floatY 2s 1.5s ease-in-out infinite; }
 
-  /* ───────────────────────────────────────────────
-     BARRA DE PROGRESSO (surge ao sair da inicial)
-     ─────────────────────────────────────────────── */
+  /* ── BARRA DE PROGRESSO ── */
   .progress {
     position: fixed; top: 0; left: 0; right: 0; z-index: 50;
-    background: rgba(245,240,232,0.82); backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    background: rgba(245,240,232,0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--soft);
-    padding-top: var(--safe-top);                 /* não fica sob o notch */
+    padding-top: var(--safe-top);
     opacity: 0; transform: translateY(-100%);
     transition: opacity 0.45s ease, transform 0.45s ease;
     pointer-events: none; will-change: opacity, transform;
   }
   .progress.visible { opacity: 1; transform: none; pointer-events: auto; }
-  /* Fallback quando o desfoque não é suportado: fundo mais opaco */
   @supports not ((backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px))) {
     .progress { background: rgba(245,240,232,0.97); }
   }
   .progress-inner {
     max-width: 600px; margin: 0 auto; display: flex; justify-content: center;
     gap: 0; padding: 0.7rem 1rem 0.5rem;
-    padding-left: max(1rem, var(--safe-left));
-    padding-right: max(1rem, var(--safe-right));
+    padding-left: max(1rem, var(--safe-left)); padding-right: max(1rem, var(--safe-right));
   }
   .progress-line-wrap { max-width: 600px; margin: 0 auto; height: 2px; background: var(--light-warm); }
   .progress-fill { height: 100%; width: 0; background: var(--gold); transition: width 0.5s ease; }
@@ -265,12 +243,7 @@
   }
   .step.active { color: var(--ink); }
   .step.done   { color: var(--warm); }
-  .step-num {
-    width: 22px; height: 22px; border-radius: 50%;
-    border: 1px solid currentColor;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.6rem; flex-shrink: 0;
-  }
+  .step-num { width: 22px; height: 22px; border-radius: 50%; border: 1px solid currentColor; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; flex-shrink: 0; }
   .step-line { width: 36px; height: 1px; background: var(--soft); margin: 0 0.25rem; }
 
   /* ── BLOCOS ── */
@@ -290,18 +263,11 @@
   .mod-card {
     border: 1.5px solid var(--light-warm); border-radius: 2px;
     padding: 1rem 1.25rem; cursor: pointer; transition: all 0.2s;
-    display: flex; justify-content: space-between; align-items: center;
-    position: relative;
+    display: flex; justify-content: space-between; align-items: center; position: relative;
   }
   .mod-card:hover { border-color: var(--warm); background: var(--cream); }
-  .mod-card.selected {
-    border-color: var(--gold);
-    background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(139,111,71,0.04));
-  }
-  .mod-card.selected::before {
-    content: '✓'; position: absolute; top: 0.6rem; right: 0.75rem;
-    color: var(--gold); font-size: 0.8rem; font-family: 'DM Mono', monospace;
-  }
+  .mod-card.selected { border-color: var(--gold); background: linear-gradient(135deg, rgba(201,168,76,0.06), rgba(139,111,71,0.04)); }
+  .mod-card.selected::before { content: '✓'; position: absolute; top: 0.6rem; right: 0.75rem; color: var(--gold); font-size: 0.8rem; font-family: 'DM Mono', monospace; }
   .mod-name  { font-size: 1.15rem; font-weight: 600; }
   .mod-dur   { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: var(--warm); margin-top: 0.1rem; }
   .mod-price { font-size: 1.4rem; font-weight: 300; color: var(--green); font-style: italic; }
@@ -312,35 +278,20 @@
   /* ── CALENDÁRIO ── */
   .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
   .cal-nav button {
-    background: none; border: 1px solid var(--light-warm);
-    -webkit-appearance: none; appearance: none;
-    padding: 0.4rem 0.75rem; cursor: pointer;
-    font-family: 'DM Mono', monospace; font-size: 0.7rem;
-    color: var(--warm); border-radius: 2px; transition: all 0.2s;
+    background: none; border: 1px solid var(--light-warm); -webkit-appearance: none; appearance: none;
+    padding: 0.4rem 0.75rem; cursor: pointer; font-family: 'DM Mono', monospace;
+    font-size: 0.7rem; color: var(--warm); border-radius: 2px; transition: all 0.2s;
   }
   .cal-nav button:hover { border-color: var(--warm); color: var(--ink); }
   .cal-month { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; }
-
-  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
-  .cal-weekday {
-    text-align: center; font-family: 'DM Mono', monospace;
-    font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase;
-    color: var(--warm); padding: 0.5rem 0;
-  }
-  .cal-day {
-    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
-    font-size: 0.9rem; border-radius: 2px; cursor: default;
-    transition: all 0.15s; border: 1.5px solid transparent;
-  }
+  .cal-grid  { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-weekday { text-align: center; font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--warm); padding: 0.5rem 0; }
+  .cal-day { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; border-radius: 2px; cursor: default; transition: all 0.15s; border: 1.5px solid transparent; }
   .cal-day.past, .cal-day.weekend { color: var(--soft); cursor: not-allowed; }
   .cal-day.available { cursor: pointer; color: var(--ink); }
   .cal-day.available:hover { border-color: var(--warm); background: var(--cream); }
   .cal-day.selected-day { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-
-  .cal-day.fully-booked {
-    color: var(--soft); cursor: not-allowed;
-    text-decoration: line-through; background: #f9f6f1;
-  }
+  .cal-day.fully-booked { color: var(--soft); cursor: not-allowed; text-decoration: line-through; background: #f9f6f1; }
   .cal-day.partial-booked { cursor: pointer; color: var(--ink); position: relative; }
   .cal-day.partial-booked::after {
     content: ''; position: absolute; bottom: 3px; left: 50%;
@@ -353,93 +304,46 @@
   .slot {
     border: 1.5px solid var(--light-warm); border-radius: 2px;
     padding: 0.5rem; text-align: center; cursor: pointer;
-    font-family: 'DM Mono', monospace; font-size: 0.75rem;
-    transition: all 0.2s; color: var(--ink);
+    font-family: 'DM Mono', monospace; font-size: 0.75rem; transition: all 0.2s; color: var(--ink);
   }
   .slot:hover { border-color: var(--warm); background: var(--cream); }
   .slot.selected-slot { background: var(--ink); color: var(--cream); border-color: var(--ink); }
-
-  .slot.booked-slot {
-    color: var(--soft); cursor: not-allowed;
-    background: #fafafa; border-color: #f0ece4; position: relative;
-  }
-  .slot.booked-slot::after {
-    content: '✕'; position: absolute; top: 50%; left: 50%;
-    transform: translate(-50%,-50%); font-size: 0.5rem; color: var(--soft); opacity: 0.6;
-  }
+  .slot.booked-slot { color: var(--soft); cursor: not-allowed; background: #fafafa; border-color: #f0ece4; position: relative; }
+  .slot.booked-slot::after { content: '✕'; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 0.5rem; color: var(--soft); opacity: 0.6; }
   .slot.booked-slot:hover { border-color: #f0ece4; background: #fafafa; }
   .slot.disabled-slot { color: #d4c8b5; cursor: not-allowed; background: #fafafa; }
   .slot.disabled-slot:hover { border-color: #e8dfd0; background: #fafafa; }
-
-  .slot-date {
-    font-family: 'DM Mono', monospace; font-size: 0.65rem;
-    letter-spacing: 0.06em; color: var(--green); margin-bottom: 0.9rem; text-align: center;
-  }
+  .slot-date { font-family: 'DM Mono', monospace; font-size: 0.65rem; letter-spacing: 0.06em; color: var(--green); margin-bottom: 0.9rem; text-align: center; }
 
   /* ── FORMULÁRIO ── */
   .form-row { margin-bottom: 1.25rem; }
-  label {
-    display: block; font-family: 'DM Mono', monospace;
-    font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase;
-    color: var(--warm); margin-bottom: 0.4rem;
-  }
-  input, textarea {
-    width: 100%; border: 1.5px solid var(--light-warm); border-radius: 2px;
-    padding: 0.7rem 0.9rem; font-family: 'Cormorant Garamond', serif;
-    font-size: 1rem; color: var(--ink); background: white;
-    outline: none; transition: border-color 0.2s;
-  }
+  label { display: block; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--warm); margin-bottom: 0.4rem; }
+  input, textarea { width: 100%; border: 1.5px solid var(--light-warm); border-radius: 2px; padding: 0.7rem 0.9rem; font-family: 'Cormorant Garamond', serif; font-size: 1rem; color: var(--ink); background: white; outline: none; transition: border-color 0.2s; }
   input:focus, textarea:focus { border-color: var(--warm); }
   textarea { resize: vertical; min-height: 70px; }
 
   /* ── RESUMO ── */
-  .summary-row {
-    display: flex; justify-content: space-between;
-    padding: 0.45rem 0; border-bottom: 1px dashed var(--light-warm); font-size: 0.95rem;
-  }
+  .summary-row { display: flex; justify-content: space-between; padding: 0.45rem 0; border-bottom: 1px dashed var(--light-warm); font-size: 0.95rem; }
   .summary-row:last-child { border-bottom: none; }
   .summary-row span:first-child { color: var(--warm); font-style: italic; }
-  .summary-row span:last-child { font-weight: 600; font-family: 'DM Mono', monospace; font-size: 0.85rem; }
-  .total-row {
-    display: flex; justify-content: space-between;
-    margin-top: 0.9rem; padding-top: 0.9rem; border-top: 2px solid var(--ink);
-    font-size: 1.1rem; font-weight: 600;
-  }
+  .summary-row span:last-child  { font-weight: 600; font-family: 'DM Mono', monospace; font-size: 0.85rem; }
+  .total-row { display: flex; justify-content: space-between; margin-top: 0.9rem; padding-top: 0.9rem; border-top: 2px solid var(--ink); font-size: 1.1rem; font-weight: 600; }
   .total-row .price { color: var(--green); font-size: 1.5rem; font-style: italic; }
 
   /* ── MBWAY ── */
-  .mbway-box {
-    background: linear-gradient(135deg, #0d2b1a, #1a4a2e);
-    border-radius: 4px; padding: 1.5rem; color: white; text-align: center; margin-top: 1.25rem;
-  }
-  .mbway-logo    { font-family: 'DM Mono', monospace; font-size: 1.3rem; letter-spacing: 0.15em; color: #4ade80; font-weight: 400; margin-bottom: 0.3rem; }
+  .mbway-box { background: linear-gradient(135deg, #0d2b1a, #1a4a2e); border-radius: 4px; padding: 1.5rem; color: white; text-align: center; margin-top: 1.25rem; }
+  .mbway-logo        { font-family: 'DM Mono', monospace; font-size: 1.3rem; letter-spacing: 0.15em; color: #4ade80; font-weight: 400; margin-bottom: 0.3rem; }
   .mbway-instruction { font-size: 0.95rem; font-style: italic; color: rgba(255,255,255,0.8); line-height: 1.5; margin-bottom: 0.9rem; }
-  .mbway-number {
-    font-family: 'DM Mono', monospace; font-size: 1.25rem; color: #4ade80;
-    letter-spacing: 0.1em; background: rgba(255,255,255,0.06);
-    display: inline-flex; align-items: center; gap: 0.65rem;
-    padding: 0.6rem 1.15rem; border-radius: 10px;
-    border: 1px solid rgba(74,222,128,0.35); cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s, box-shadow 0.2s;
-  }
+  .mbway-number { font-family: 'DM Mono', monospace; font-size: 1.25rem; color: #4ade80; letter-spacing: 0.1em; background: rgba(255,255,255,0.06); display: inline-flex; align-items: center; gap: 0.65rem; padding: 0.6rem 1.15rem; border-radius: 10px; border: 1px solid rgba(74,222,128,0.35); cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.1s, box-shadow 0.2s; }
   .mbway-number:hover  { background: rgba(255,255,255,0.12); border-color: rgba(74,222,128,0.6); box-shadow: 0 0 0 4px rgba(74,222,128,0.08); }
   .mbway-number:active { transform: scale(0.97); }
   .mbway-digits { user-select: all; -webkit-user-select: all; }
   .mbway-copy   { opacity: 0.65; flex-shrink: 0; }
   .mbway-number:hover .mbway-copy { opacity: 1; }
-  .mbway-note {
-    margin-top: 0.7rem; font-family: 'DM Mono', monospace; font-size: 0.6rem;
-    letter-spacing: 0.1em; color: rgba(255,255,255,0.45); text-transform: uppercase;
-  }
+  .mbway-note   { margin-top: 0.7rem; font-family: 'DM Mono', monospace; font-size: 0.6rem; letter-spacing: 0.1em; color: rgba(255,255,255,0.45); text-transform: uppercase; }
 
-  /* ── BOTÕES (apenas confirmar / nova marcação) ── */
-  .btn {
-    display: block; width: 100%; padding: 0.9rem;
-    -webkit-appearance: none; appearance: none;
-    background: var(--ink); color: var(--cream); border: none; border-radius: 2px;
-    font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.2em;
-    text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-top: 1.25rem;
-  }
+  /* ── BOTÕES ── */
+  .btn { display: block; width: 100%; padding: 0.9rem; -webkit-appearance: none; appearance: none; background: var(--ink); color: var(--cream); border: none; border-radius: 2px; font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.2em; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-top: 1.25rem; }
   .btn:hover    { background: var(--warm); }
   .btn:disabled { background: var(--soft); cursor: not-allowed; }
 
@@ -447,46 +351,20 @@
   .success-screen { text-align: center; }
   .success-icon { font-size: 3rem; margin-bottom: 1rem; }
   .success-screen h2 { font-size: 2rem; font-weight: 300; margin-bottom: 0.5rem; }
-  .success-screen p { color: var(--warm); font-style: italic; line-height: 1.6; }
+  .success-screen p  { color: var(--warm); font-style: italic; line-height: 1.6; }
 
   /* ── UTILITÁRIOS ── */
-  .note    { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--warm); letter-spacing: 0.05em; margin-top: 0.5rem; }
-  .deposit-info {
-    margin-top: 0.75rem; background: #fef9ec; border: 1px solid #e8d98a;
-    border-radius: 2px; padding: 0.7rem 1rem;
-    font-family: 'DM Mono', monospace; font-size: 0.74rem; color: #92600a;
-    letter-spacing: 0.04em; line-height: 1.7; white-space: pre-line;
-    text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(146,96,10,0.4);
-  }
-  .late-alert {
-    display: block; margin-top: 1rem; background: #fef9ec; border: 1px solid #e8d98a;
-    border-radius: 2px; padding: 0.8rem 1rem;
-    font-family: 'DM Mono', monospace; font-size: 0.74rem; color: #92600a;
-    letter-spacing: 0.04em; line-height: 1.7;
-  }
-  .late-alert.urgent {
-    background: #fff3cd; border-color: #f0c040;
-    font-weight: bold;
-  }
+  .note { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--warm); letter-spacing: 0.05em; margin-top: 0.5rem; }
+  .deposit-info { margin-top: 0.75rem; background: #fef9ec; border: 1px solid #e8d98a; border-radius: 2px; padding: 0.7rem 1rem; font-family: 'DM Mono', monospace; font-size: 0.74rem; color: #92600a; letter-spacing: 0.04em; line-height: 1.7; white-space: pre-line; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(146,96,10,0.4); }
+  .late-alert { display: block; margin-top: 1rem; background: #fef9ec; border: 1px solid #e8d98a; border-radius: 2px; padding: 0.8rem 1rem; font-family: 'DM Mono', monospace; font-size: 0.74rem; color: #92600a; letter-spacing: 0.04em; line-height: 1.7; }
+  .late-alert.urgent { background: #fff3cd; border-color: #f0c040; font-weight: bold; }
 
   /* ── LOADING ── */
-  .slots-loading {
-    text-align: center; padding: 1.5rem;
-    font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--warm); letter-spacing: 0.1em;
-  }
-  .slots-loading::after {
-    content: ''; display: inline-block; width: 12px; height: 12px;
-    border: 2px solid var(--light-warm); border-top-color: var(--warm);
-    border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 0.5rem; vertical-align: middle;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .slots-loading { text-align: center; padding: 1.5rem; font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--warm); letter-spacing: 0.1em; }
+  .slots-loading::after { content: ''; display: inline-block; width: 12px; height: 12px; border: 2px solid var(--light-warm); border-top-color: var(--warm); border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 0.5rem; vertical-align: middle; }
 
   /* ── LEGENDAS ── */
-  .slots-legend {
-    display: flex; gap: 1.25rem; margin-bottom: 0.75rem;
-    font-family: 'DM Mono', monospace; font-size: 0.55rem;
-    letter-spacing: 0.1em; color: var(--warm); text-transform: uppercase;
-  }
+  .slots-legend { display: flex; gap: 1.25rem; margin-bottom: 0.75rem; font-family: 'DM Mono', monospace; font-size: 0.55rem; letter-spacing: 0.1em; color: var(--warm); text-transform: uppercase; }
   .slots-legend span { display: flex; align-items: center; gap: 0.35rem; }
   .legend-dot { width: 10px; height: 10px; border-radius: 1px; border: 1.5px solid; flex-shrink: 0; }
   .legend-dot.free  { border-color: var(--light-warm); background: white; }
@@ -502,224 +380,78 @@
   }
   .cal-legend span { display: flex; align-items: center; gap: 0.45rem; }
   .cal-legend-dot { width: 13px; height: 13px; border-radius: 2px; flex-shrink: 0; }
-  .cal-legend-dot.avail  { background: white; border: 1.5px solid var(--light-warm); }
-  .cal-legend-dot.partial{ background: white; border: 1.5px solid var(--light-warm); position: relative; }
-  .cal-legend-dot.partial::after {
-    content: ''; position: absolute; bottom: -1px; left: 50%;
-    transform: translateX(-50%); width: 4px; height: 4px;
-    border-radius: 50%; background: var(--gold);
-  }
-  .cal-legend-dot.full   { background: #f9f6f1; border: 1.5px solid var(--soft); }
-  .cal-legend-note {
-    width: 100%;
-    margin-top: 0.5rem;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem;
-    color: var(--warm);
-    letter-spacing: 0.04em;
-    background: rgba(201,168,76,0.08);
-    border-left: 2px solid var(--gold);
-    padding: 0.4rem 0.65rem;
-    border-radius: 0 2px 2px 0;
-  }
+  .cal-legend-dot.avail   { background: white; border: 1.5px solid var(--light-warm); }
+  .cal-legend-dot.partial { background: white; border: 1.5px solid var(--light-warm); position: relative; }
+  .cal-legend-dot.partial::after { content: ''; position: absolute; bottom: -1px; left: 50%; transform: translateX(-50%); width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+  .cal-legend-dot.full    { background: #f9f6f1; border: 1.5px solid var(--soft); }
+  .cal-legend-note { width: 100%; margin-top: 0.5rem; font-family: 'DM Mono', monospace; font-size: 0.62rem; color: var(--warm); letter-spacing: 0.04em; background: rgba(201,168,76,0.08); border-left: 2px solid var(--gold); padding: 0.4rem 0.65rem; border-radius: 0 2px 2px 0; }
 
-  /* Alvos de toque sem atraso de 300ms */
+  /* ── TOUCH TARGETS ── */
   .btn, .mod-card, .slot, .cal-day, .cal-nav button, .mbway-number, .step { touch-action: manipulation; }
 
-  /* ═══════════════════════════════════════════════════════════════
-     SISTEMA RESPONSIVO FLUIDO — funciona em todos os dispositivos
-     desde iPhone SE (320px) até telemóveis grandes (430px+) e tablets
-     ═══════════════════════════════════════════════════════════════ */
-
-  /* ── Base móvel (≤ 768px) ── */
+  /* ═══════════════════════════════════════════════
+     RESPONSIVO
+     ═══════════════════════════════════════════════ */
   @media (max-width: 768px) {
-    html {
-      overflow-y: scroll;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    body { overflow-x: hidden; }
-
-    /* Altura, padding e centragem do painel vêm da regra base (.panel, svh)
-       e o tamanho final é garantido pelo motor de auto-redimensionamento (JS). */
     .panel-inner { max-width: 100%; }
-
-    /* ── Página inicial ── sem barra de progresso, padding simétrico */
-    .panel-welcome {
-      padding: 2rem clamp(0.75rem, 4vw, 1.25rem);
-      padding-top: calc(2rem + var(--safe-top));
-      padding-bottom: calc(2rem + var(--safe-bottom));
-      padding-left: calc(clamp(0.75rem, 4vw, 1.25rem) + var(--safe-left));
-      padding-right: calc(clamp(0.75rem, 4vw, 1.25rem) + var(--safe-right));
-    }
-    .welcome-inner h1 {
-      font-size: clamp(2rem, 10.5vw, 4rem);
-    }
-    .welcome-inner p  { font-size: clamp(0.95rem, 3.5vw, 1.2rem); }
-    .welcome-divider  { margin: clamp(1rem, 2.5vh, 1.75rem) auto; }
-
-    /* ── Progress bar ── */
+    .panel-welcome { padding: 2rem clamp(0.75rem,4vw,1.25rem); padding-top: calc(2rem + var(--safe-top)); padding-bottom: calc(2rem + var(--safe-bottom)); padding-left: calc(clamp(0.75rem,4vw,1.25rem) + var(--safe-left)); padding-right: calc(clamp(0.75rem,4vw,1.25rem) + var(--safe-right)); }
+    .welcome-inner h1 { font-size: clamp(2rem,10.5vw,4rem); }
+    .welcome-inner p  { font-size: clamp(0.95rem,3.5vw,1.2rem); }
+    .welcome-divider  { margin: clamp(1rem,2.5vh,1.75rem) auto; }
     .progress { position: fixed; top: 0; }
     .step-label { display: none; }
     .step-line  { width: 20px; }
-
-    /* ── Blocos ── */
-    .block {
-      padding: clamp(0.85rem, 3vw, 1.5rem) clamp(0.85rem, 3.5vw, 1.25rem);
-      border-radius: 4px;
-    }
-    .block-title {
-      margin-bottom: clamp(0.65rem, 1.8vh, 1.25rem);
-      padding-bottom: clamp(0.45rem, 1vh, 0.75rem);
-    }
-
-    /* ── Modalidades ── */
-    .modalities { gap: clamp(0.4rem, 1.2vh, 0.75rem); }
-    .mod-card {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 0.25rem;
-      padding: clamp(0.6rem, 1.5vh, 1rem) clamp(0.85rem, 3vw, 1.25rem);
-    }
-    .mod-right {
-      text-align: left;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .mod-name    { font-size: clamp(0.95rem, 3.5vw, 1.15rem); }
-    .mod-dur     { font-size: clamp(0.6rem,  2.2vw, 0.7rem);  }
-    .mod-price   { font-size: clamp(1.05rem, 4vw,   1.4rem);  }
-    .mod-deposit,
-    .mod-due     { font-size: clamp(0.52rem, 1.8vw, 0.6rem);  }
-
-    /* ── Calendário ── */
-    .cal-nav { margin-bottom: clamp(0.5rem, 1.5vh, 1rem); }
-    .cal-month { font-size: clamp(0.9rem, 3.5vw, 1.1rem); }
-    .cal-nav button {
-      min-height: 40px;
-      padding: 0.4rem clamp(0.5rem, 2vw, 0.9rem);
-      font-size: clamp(0.6rem, 2.2vw, 0.7rem);
-    }
-    .cal-grid { gap: clamp(2px, 0.5vw, 4px); }
-    .cal-day  { font-size: clamp(0.72rem, 2.8vw, 0.9rem); }
-    .cal-weekday {
-      font-size: clamp(0.42rem, 1.6vw, 0.55rem);
-      padding: clamp(0.25rem, 0.8vh, 0.5rem) 0;
-    }
-    .cal-legend {
-      gap: clamp(0.6rem, 2vw, 1.25rem);
-      margin-top: clamp(0.4rem, 1vh, 0.75rem);
-      font-size: clamp(0.44rem, 1.7vw, 0.55rem);
-    }
-
-    /* ── Slots ── */
-    .slot-date {
-      font-size: clamp(0.52rem, 1.9vw, 0.65rem);
-      margin-bottom: clamp(0.35rem, 1vh, 0.9rem);
-    }
-    /* Ecrãs ≥ 390px: 4 colunas; abaixo: 3 colunas */
-    .slots {
-      grid-template-columns: repeat(3, 1fr);
-      gap: clamp(0.28rem, 1vw, 0.5rem);
-    }
-    .slot {
-      font-size: clamp(0.6rem, 2.3vw, 0.75rem);
-      padding: clamp(0.28rem, 0.9vh, 0.5rem) 0.1rem;
-      min-height: clamp(30px, 6vh, 44px);
-      display: flex; align-items: center; justify-content: center;
-    }
-    .slots-legend {
-      font-size: clamp(0.44rem, 1.6vw, 0.55rem);
-      gap: clamp(0.5rem, 1.8vw, 1.25rem);
-      margin-bottom: clamp(0.35rem, 1vh, 0.75rem);
-    }
-    .slots-note {
-      font-size: clamp(0.48rem, 1.7vw, 0.6rem);
-      margin-top: clamp(0.35rem, 1vh, 0.75rem);
-    }
-
-    /* ── Formulário ── */
-    .form-row { margin-bottom: clamp(0.65rem, 1.8vh, 1.25rem); }
-    label {
-      font-size: clamp(0.52rem, 1.9vw, 0.6rem);
-      margin-bottom: clamp(0.25rem, 0.8vh, 0.4rem);
-    }
-    input, textarea {
-      min-height: clamp(42px, 7vh, 52px);
-      padding: clamp(0.45rem, 1.2vh, 0.7rem) clamp(0.7rem, 2.5vw, 0.9rem);
-      font-size: 16px; /* Evita zoom automático no iOS */
-    }
-    textarea { min-height: clamp(52px, 9vh, 80px); }
-
-    /* Touch targets mínimos de 44px */
-    .btn {
-      min-height: clamp(44px, 7.5vh, 56px);
-      font-size: clamp(0.62rem, 2.3vw, 0.75rem);
-      padding: clamp(0.7rem, 2vh, 1rem);
-      margin-top: clamp(0.75rem, 2vh, 1.25rem);
-    }
-
-    /* ── Resumo ── */
-    .summary-row {
-      font-size: clamp(0.78rem, 3vw, 0.95rem);
-      padding: clamp(0.3rem, 0.9vh, 0.45rem) 0;
-    }
-    .summary-row span:last-child { font-size: clamp(0.68rem, 2.5vw, 0.85rem); }
-    .total-row {
-      font-size: clamp(0.9rem, 3.5vw, 1.1rem);
-      margin-top: clamp(0.55rem, 1.5vh, 0.9rem);
-      padding-top: clamp(0.55rem, 1.5vh, 0.9rem);
-    }
-    .total-row .price { font-size: clamp(1.15rem, 4.5vw, 1.5rem); }
-
-    /* ── MBWay ── */
-    .mbway-box {
-      padding: clamp(0.75rem, 2.5vh, 1.5rem);
-      margin-top: clamp(0.75rem, 2vh, 1.25rem);
-    }
-    .mbway-logo        { font-size: clamp(0.95rem, 3.8vw, 1.3rem); }
-    .mbway-instruction { font-size: clamp(0.75rem, 2.8vw, 0.95rem); margin-bottom: clamp(0.5rem, 1.5vh, 0.9rem); }
-    .mbway-number      { font-size: clamp(0.98rem, 3.7vw, 1.25rem); padding: clamp(0.45rem,1.4vh,0.6rem) clamp(0.7rem, 2.6vw, 1.15rem); gap: clamp(0.45rem,1.6vw,0.65rem); min-height: 44px; }
-    .mbway-note        { font-size: clamp(0.5rem, 1.8vw, 0.6rem); margin-top: clamp(0.4rem, 1.2vh, 0.7rem); }
-
-    /* ── Deposit / late alert ── */
-    .deposit-info {
-      font-size: clamp(0.64rem, 2.3vw, 0.74rem);
-      padding: clamp(0.45rem, 1.2vh, 0.7rem) clamp(0.7rem, 2.5vw, 1rem);
-      margin-top: clamp(0.45rem, 1.2vh, 0.75rem);
-    }
-    .late-alert {
-      font-size: clamp(0.64rem, 2.3vw, 0.74rem);
-      padding: clamp(0.5rem, 1.3vh, 0.8rem) clamp(0.7rem, 2.5vw, 1rem);
-      margin-top: clamp(0.5rem, 1.5vh, 1rem);
-    }
-
-    /* ── Sucesso ── */
-    .success-icon  { font-size: clamp(2rem, 7vw, 3rem); margin-bottom: clamp(0.5rem, 1.5vh, 1rem); }
-    .success-screen h2 { font-size: clamp(1.5rem, 6vw, 2rem); }
-    .success-screen p  { font-size: clamp(0.85rem, 3.2vw, 1rem); }
+    .block { padding: clamp(0.85rem,3vw,1.5rem) clamp(0.85rem,3.5vw,1.25rem); border-radius: 4px; }
+    .block-title { margin-bottom: clamp(0.65rem,1.8vh,1.25rem); padding-bottom: clamp(0.45rem,1vh,0.75rem); }
+    .modalities { gap: clamp(0.4rem,1.2vh,0.75rem); }
+    .mod-card { flex-direction: column; align-items: flex-start; gap: 0.25rem; padding: clamp(0.6rem,1.5vh,1rem) clamp(0.85rem,3vw,1.25rem); }
+    .mod-right { text-align: left; display: flex; align-items: center; gap: 0.75rem; }
+    .mod-name    { font-size: clamp(0.95rem,3.5vw,1.15rem); }
+    .mod-dur     { font-size: clamp(0.6rem,2.2vw,0.7rem);  }
+    .mod-price   { font-size: clamp(1.05rem,4vw,1.4rem);   }
+    .mod-deposit, .mod-due { font-size: clamp(0.52rem,1.8vw,0.6rem); }
+    .cal-nav { margin-bottom: clamp(0.5rem,1.5vh,1rem); }
+    .cal-month { font-size: clamp(0.9rem,3.5vw,1.1rem); }
+    .cal-nav button { min-height: 40px; padding: 0.4rem clamp(0.5rem,2vw,0.9rem); font-size: clamp(0.6rem,2.2vw,0.7rem); }
+    .cal-grid { gap: clamp(2px,0.5vw,4px); }
+    .cal-day  { font-size: clamp(0.72rem,2.8vw,0.9rem); }
+    .cal-weekday { font-size: clamp(0.42rem,1.6vw,0.55rem); padding: clamp(0.25rem,0.8vh,0.5rem) 0; }
+    .cal-legend  { gap: clamp(0.6rem,2vw,1.25rem); margin-top: clamp(0.4rem,1vh,0.75rem); font-size: clamp(0.52rem,1.9vw,0.65rem); }
+    .slot-date   { font-size: clamp(0.52rem,1.9vw,0.65rem); margin-bottom: clamp(0.35rem,1vh,0.9rem); }
+    .slots { grid-template-columns: repeat(3,1fr); gap: clamp(0.28rem,1vw,0.5rem); }
+    .slot  { font-size: clamp(0.6rem,2.3vw,0.75rem); padding: clamp(0.28rem,0.9vh,0.5rem) 0.1rem; min-height: clamp(30px,6vh,44px); display: flex; align-items: center; justify-content: center; }
+    .slots-legend { font-size: clamp(0.44rem,1.6vw,0.55rem); gap: clamp(0.5rem,1.8vw,1.25rem); margin-bottom: clamp(0.35rem,1vh,0.75rem); }
+    .slots-note   { font-size: clamp(0.48rem,1.7vw,0.6rem); margin-top: clamp(0.35rem,1vh,0.75rem); }
+    .form-row { margin-bottom: clamp(0.65rem,1.8vh,1.25rem); }
+    label { font-size: clamp(0.52rem,1.9vw,0.6rem); margin-bottom: clamp(0.25rem,0.8vh,0.4rem); }
+    input, textarea { min-height: clamp(42px,7vh,52px); padding: clamp(0.45rem,1.2vh,0.7rem) clamp(0.7rem,2.5vw,0.9rem); font-size: 16px; }
+    textarea { min-height: clamp(52px,9vh,80px); }
+    .btn { min-height: clamp(44px,7.5vh,56px); font-size: clamp(0.62rem,2.3vw,0.75rem); padding: clamp(0.7rem,2vh,1rem); margin-top: clamp(0.75rem,2vh,1.25rem); }
+    .summary-row { font-size: clamp(0.78rem,3vw,0.95rem); padding: clamp(0.3rem,0.9vh,0.45rem) 0; }
+    .summary-row span:last-child { font-size: clamp(0.68rem,2.5vw,0.85rem); }
+    .total-row { font-size: clamp(0.9rem,3.5vw,1.1rem); margin-top: clamp(0.55rem,1.5vh,0.9rem); padding-top: clamp(0.55rem,1.5vh,0.9rem); }
+    .total-row .price { font-size: clamp(1.15rem,4.5vw,1.5rem); }
+    .mbway-box  { padding: clamp(0.75rem,2.5vh,1.5rem); margin-top: clamp(0.75rem,2vh,1.25rem); }
+    .mbway-logo        { font-size: clamp(0.95rem,3.8vw,1.3rem); }
+    .mbway-instruction { font-size: clamp(0.75rem,2.8vw,0.95rem); margin-bottom: clamp(0.5rem,1.5vh,0.9rem); }
+    .mbway-number      { font-size: clamp(0.98rem,3.7vw,1.25rem); padding: clamp(0.45rem,1.4vh,0.6rem) clamp(0.7rem,2.6vw,1.15rem); gap: clamp(0.45rem,1.6vw,0.65rem); min-height: 44px; }
+    .mbway-note        { font-size: clamp(0.5rem,1.8vw,0.6rem); margin-top: clamp(0.4rem,1.2vh,0.7rem); }
+    .deposit-info { font-size: clamp(0.64rem,2.3vw,0.74rem); padding: clamp(0.45rem,1.2vh,0.7rem) clamp(0.7rem,2.5vw,1rem); margin-top: clamp(0.45rem,1.2vh,0.75rem); }
+    .late-alert   { font-size: clamp(0.64rem,2.3vw,0.74rem); padding: clamp(0.5rem,1.3vh,0.8rem) clamp(0.7rem,2.5vw,1rem); margin-top: clamp(0.5rem,1.5vh,1rem); }
+    .success-icon  { font-size: clamp(2rem,7vw,3rem); margin-bottom: clamp(0.5rem,1.5vh,1rem); }
+    .success-screen h2 { font-size: clamp(1.5rem,6vw,2rem); }
+    .success-screen p  { font-size: clamp(0.85rem,3.2vw,1rem); }
   }
-
-  /* ── 4 colunas de slots em ecrãs ≥ 390px ── */
-  @media (min-width: 390px) and (max-width: 768px) {
-    .slots { grid-template-columns: repeat(4, 1fr); }
-  }
-
-  /* ── iPhone SE e ecrãs muito pequenos (< 360px) ── */
+  @media (min-width: 390px) and (max-width: 768px) { .slots { grid-template-columns: repeat(4,1fr); } }
   @media (max-width: 359px) {
-    .welcome-inner h1 { font-size: clamp(1.7rem, 11vw, 2.2rem); }
-    .slots { grid-template-columns: repeat(2, 1fr); }
+    .welcome-inner h1 { font-size: clamp(1.7rem,11vw,2.2rem); }
+    .slots { grid-template-columns: repeat(2,1fr); }
     .slot  { font-size: 0.68rem; }
     .block { padding: 0.75rem; }
   }
-
-  /* ── Sem animações para quem as desativa ── */
   @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
     * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.05ms !important; }
   }
-
 </style>
 </head>
 <body>
@@ -738,7 +470,10 @@
   <div class="progress-line-wrap"><div class="progress-fill" id="progressFill"></div></div>
 </div>
 
-<!-- ═══════════════ PÁGINA INICIAL ═══════════════ -->
+<!-- ═══════════════ CONTENTOR DE SNAP ═══════════════ -->
+<div id="snap-root">
+
+<!-- PÁGINA INICIAL -->
 <section class="panel panel-welcome" id="pWelcome" data-step="0">
   <div class="welcome-inner">
     <div class="brand-name">MIXEDBYRAFA</div>
@@ -755,51 +490,30 @@
   </div>
 </section>
 
-<!-- ═══════════════ ETAPA 1 — MODALIDADE ═══════════════ -->
-<section class="panel reveal" id="pMod" data-step="1">
+<!-- ETAPA 1 — MODALIDADE -->
+<section class="panel" id="pMod" data-step="1">
   <div class="panel-inner">
     <div class="block">
       <div class="block-title">Escolha a modalidade</div>
       <div class="modalities">
         <div class="mod-card" data-mod="curta" data-price="35" data-deposit="35" data-dur="1" data-label="Sessão Curta" onclick="selectMod(this)">
-          <div>
-            <div class="mod-name">Sessão Curta</div>
-            <div class="mod-dur">1 hora</div>
-            <div class="mod-deposit">Pagamento integral para reservar</div>
-          </div>
-          <div class="mod-right">
-            <div class="mod-price">35€</div>
-            <div class="mod-due">35€ agora</div>
-          </div>
+          <div><div class="mod-name">Sessão Curta</div><div class="mod-dur">1 hora</div><div class="mod-deposit">Pagamento integral para reservar</div></div>
+          <div class="mod-right"><div class="mod-price">35€</div><div class="mod-due">35€ agora</div></div>
         </div>
         <div class="mod-card" data-mod="standard" data-price="50" data-deposit="25" data-dur="2" data-label="Sessão Standard" onclick="selectMod(this)">
-          <div>
-            <div class="mod-name">Sessão Standard</div>
-            <div class="mod-dur">2 horas</div>
-            <div class="mod-deposit">Sinal de 50% para reservar</div>
-          </div>
-          <div class="mod-right">
-            <div class="mod-price">50€</div>
-            <div class="mod-due">25€ agora</div>
-          </div>
+          <div><div class="mod-name">Sessão Standard</div><div class="mod-dur">2 horas</div><div class="mod-deposit">Sinal de 50% para reservar</div></div>
+          <div class="mod-right"><div class="mod-price">50€</div><div class="mod-due">25€ agora</div></div>
         </div>
         <div class="mod-card" data-mod="premium" data-price="80" data-deposit="40" data-dur="4" data-label="Sessão Premium" onclick="selectMod(this)">
-          <div>
-            <div class="mod-name">Sessão Premium</div>
-            <div class="mod-dur">4 horas</div>
-            <div class="mod-deposit">Sinal de 50% para reservar</div>
-          </div>
-          <div class="mod-right">
-            <div class="mod-price">80€</div>
-            <div class="mod-due">40€ agora</div>
-          </div>
+          <div><div class="mod-name">Sessão Premium</div><div class="mod-dur">4 horas</div><div class="mod-deposit">Sinal de 50% para reservar</div></div>
+          <div class="mod-right"><div class="mod-price">80€</div><div class="mod-due">40€ agora</div></div>
         </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ═══════════════ ETAPA 2a — DATA ═══════════════ -->
+<!-- ETAPA 2a — DATA -->
 <section class="panel locked" id="pCal" data-step="2">
   <div class="panel-inner">
     <div class="block">
@@ -820,7 +534,7 @@
   </div>
 </section>
 
-<!-- ═══════════════ ETAPA 2b — HORÁRIO ═══════════════ -->
+<!-- ETAPA 2b — HORÁRIO -->
 <section class="panel locked" id="pTime" data-step="2">
   <div class="panel-inner">
     <div class="block">
@@ -837,10 +551,10 @@
   </div>
 </section>
 
-<!-- ═══════════════ ETAPA 3 — DADOS ═══════════════ -->
+<!-- ETAPA 3 — DADOS -->
 <section class="panel locked" id="pForm" data-step="3">
   <div class="panel-inner">
-    <div class="block">
+    <div class="block" id="formBlock">
       <div class="block-title">Os seus dados</div>
       <div class="form-row">
         <label>Nome completo</label>
@@ -863,7 +577,7 @@
   </div>
 </section>
 
-<!-- ═══════════════ ETAPA 4 — PAGAMENTO ═══════════════ -->
+<!-- ETAPA 4 — PAGAMENTO -->
 <section class="panel locked" id="pPay" data-step="4">
   <div class="panel-inner">
     <div class="block">
@@ -886,269 +600,117 @@
   </div>
 </section>
 
-<!-- ═══════════════ SUCESSO ═══════════════ -->
+<!-- SUCESSO -->
 <section class="panel locked" id="pSuccess">
   <div class="panel-inner">
     <div class="block success-screen">
       <div class="success-icon">✦</div>
       <h2>Marcação submetida!</h2>
-      <p style="margin-top:0.75rem">
-        A sua marcação foi registada com sucesso.<br>
-        Assim que o pagamento MBWay for validado,<br>
-        receberá a confirmação por email e SMS.
-      </p>
+      <p style="margin-top:0.75rem">A sua marcação foi registada com sucesso.<br>Assim que o pagamento MBWay for validado,<br>receberá a confirmação por email e SMS.</p>
       <div style="margin-top:1.75rem;padding:1rem;background:var(--cream);border-radius:2px;border:1px solid var(--light-warm)" id="successDetails"></div>
       <button class="btn" style="max-width:240px;margin:1.5rem auto 0" onclick="resetAll()">Nova marcação</button>
     </div>
   </div>
 </section>
 
+</div><!-- fim #snap-root -->
+
 <script>
 // ─────────────────────────────────────────────────────────────
 //  !! ÚNICA VARIÁVEL QUE TENS DE ALTERAR !!
-//  Cola aqui o URL do teu Google Apps Script depois de publicar
-// ─────────────────────────────────────────────────────────────
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyA0asyaQNmg_pl2_VJ91_Zvz3M4O3PvkP0Z1WzBj-3oNv2sgoCpNR-Q7yXVa92zO6e/exec';
+// ─────────────────────────────────────────────────────────────
 
-// ─── Configuração ─────────────────────────────────────────────
 const MBWAY_PHONE    = '+351 967 677 207';
 const SCHEDULE_START = 9;
-const MAX_END_HOUR   = 24; // Sessões podem terminar até à meia-noite
+const MAX_END_HOUR   = 24;
 
 // ─── Estado global ────────────────────────────────────────────
 let state = {
   mod: null, modLabel: null, modPrice: null, modDeposit: null, modDur: null,
-  date: null, slot: null,
-  name: '', phone: '', email: '', notes: '',
+  date: null, slot: null, name: '', phone: '', email: '', notes: '',
   calYear: null, calMonth: null
 };
-
 const bookedCache = {};
 const monthCache  = {};
-
-const today = new Date();
-today.setHours(0, 0, 0, 0);
+const today = new Date(); today.setHours(0,0,0,0);
 state.calYear  = today.getFullYear();
 state.calMonth = today.getMonth();
 
 // ═══════════════════════════════════════════════════════════════
-//  AUTO-REDIMENSIONAMENTO  —  cada painel adapta-se sempre ao ecrã
-//  Mede o conteúdo de cada painel e, se for mais alto que o espaço
-//  visível, encolhe-o proporcionalmente (transform: scale) para caber.
-//  Em casos extremos (escala < FIT_MIN) permite scroll interno.
+//  SISTEMA DE SNAP — ARQUITECTURA
+//
+//  • #snap-root é o único elemento com overflow scroll + snap.
+//  • Cada .panel tem height:100svh e scroll-snap-align:start.
+//  • Painéis locked: visibility:hidden + pointer-events:none
+//    → OCUPAM ESPAÇO no scroll mas são invisíveis e inacessíveis.
+//    → Swipe sobre eles não faz nada — o snap vai directo ao próximo visível.
+//  • Navegação programática: snapRoot.scrollTo({ top, behavior:'smooth' }).
+//  • Teclado: #form-overlay fixo cobre o ecrã sem tocar no snap-root.
 // ═══════════════════════════════════════════════════════════════
-const FIT_MIN = 0.6;          // escala mínima antes de optar por scroll interno
-let kbOpen = false;           // teclado virtual aberto (edição de campos)
 
-// Mede a altura real da barra de progresso e reserva esse espaço nos painéis
-function setBarHeight() {
-  const bar = document.getElementById('progress');
-  const h = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
-  document.documentElement.style.setProperty('--bar-h', h + 'px');
-}
+const snapRoot = document.getElementById('snap-root');
 
-// Ajusta um painel ao espaço visível
-function fitPanel(panel) {
-  if (!panel || panel.classList.contains('locked')) return;
-
-  // Alvo escalado: o cartão (.block) ou o conteúdo da página inicial
-  const target = panel.querySelector('.block') || panel.querySelector('.welcome-inner');
-  if (!target) return;
-
-  // Durante a edição não escalamos o formulário — deixamos rolar até ao campo
-  if (kbOpen && panel.id === 'pForm') return;
-
-  // Reset antes de medir
-  target.style.transform = '';
-  target.style.marginTop = '';
-  target.style.marginBottom = '';
-  panel.classList.remove('scrollable');
-  panel.scrollTop = 0;                              // limpa scroll residual (ex.: scrollIntoView)
-
-  const cs = getComputedStyle(panel);
-  const padTop    = parseFloat(cs.paddingTop) || 0;
-  const padBottom = parseFloat(cs.paddingBottom) || 0;
-  const avail   = panel.clientHeight - padTop - padBottom - 2;   // -2px de segurança
-  const natural = target.getBoundingClientRect().height;         // inclui bordas
-
-  if (avail <= 0 || natural <= avail) return;   // já cabe
-
-  const scale = avail / natural;
-  if (scale < FIT_MIN) {
-    panel.classList.add('scrollable');               // alto demais → scroll interno
-  } else {
-    target.style.transform = 'scale(' + scale.toFixed(4) + ')';
-    // O transform não altera o espaço ocupado no layout; compensamos com margens
-    // negativas simétricas para que o painel (flex-center) reflita o tamanho visual
-    // e não fique conteúdo a transbordar (que permitiria scroll indesejado).
-    const half = (natural * (1 - scale) / 2).toFixed(2);
-    target.style.marginTop = '-' + half + 'px';
-    target.style.marginBottom = '-' + half + 'px';
-  }
-}
-
-// Ajusta todos os painéis (atualizando primeiro a altura da barra)
-function fitAll() {
-  setBarHeight();
-  document.querySelectorAll('.panel').forEach(fitPanel);
-}
-
-// Agenda um fit no próximo frame (evita recalcular várias vezes seguidas)
-let fitScheduled = false;
-function scheduleFit() {
-  if (fitScheduled) return;
-  fitScheduled = true;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    fitScheduled = false;
-    fitAll();
-  }));
-}
-
-// ─── Teclado virtual: campos de formulário ────────────────────
-function isField(el) { return el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'); }
-
-// Dimensiona o painel em edição para a área realmente visível (acima do teclado)
-function sizeEditingPanel(panel) {
-  if (!panel || !panel.classList.contains('editing')) return;
-  const vv = window.visualViewport;
-  if (vv) {
-    panel.style.top    = (vv.offsetTop || 0) + 'px';
-    panel.style.height = vv.height + 'px';
-  } else {
-    panel.style.top = '0px';
-    panel.style.height = '';   // usa o 100svh/100vh do CSS
-  }
-}
-
-document.addEventListener('focusin', (e) => {
-  if (!isField(e.target)) return;
-  const panel = e.target.closest('.panel');
-  if (!panel) return;
-
-  kbOpen = true;
-  document.documentElement.classList.add('kb-open');   // desliga o snap global
-
-  // O painel cobre o ecrã durante a edição (fundo opaco):
-  //  • não se vê o painel anterior — a estética mantém-se;
-  //  • a página não faz scroll — apenas o painel rola internamente se preciso.
-  const block = panel.querySelector('.block');
-  if (block) { block.style.transform = ''; block.style.marginTop = ''; block.style.marginBottom = ''; }
-  panel.classList.add('editing');
-  sizeEditingPanel(panel);
-
-  // Mexer nos dados volta a trancar o pagamento (só "Continuar" o reabre)
-  if (panel.id === 'pForm') { lockFrom(4); validateForm(); }
-
-  // Traz o campo focado para uma posição confortável — scroll DENTRO do painel
-  setTimeout(() => { try { e.target.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {} }, 250);
-});
-
-document.addEventListener('focusout', (e) => {
-  if (!isField(e.target)) return;
-  setTimeout(() => {
-    if (isField(document.activeElement)) return;     // mudou para outro campo → continua em edição
-    kbOpen = false;
-    document.documentElement.classList.remove('kb-open');
-    const panel = document.getElementById('pForm');
-    if (panel) {
-      panel.classList.remove('editing');
-      panel.style.top = '';
-      panel.style.height = '';
-    }
-    fitAll();
-    if (panel && !panel.classList.contains('locked') && !suppressGuide) {
-      panel.scrollIntoView({ block: 'start' });       // reencaixa, sem revelar o anterior
-    }
-  }, 150);
-});
-
-// Sai imediatamente do modo de edição (usado antes de navegar via "Continuar")
-function exitEditingNow() {
-  kbOpen = false;
-  document.documentElement.classList.remove('kb-open');
-  const panel = document.getElementById('pForm');
-  if (panel) { panel.classList.remove('editing'); panel.style.top = ''; panel.style.height = ''; }
-  const a = document.activeElement;
-  if (a && isField(a)) { try { a.blur(); } catch (_) {} }
-}
-
-// ─── Reagir a mudanças de tamanho do ecrã ─────────────────────
-window.addEventListener('resize', scheduleFit);
-window.addEventListener('orientationchange', () => setTimeout(fitAll, 300));
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', () => {
-    const pForm = document.getElementById('pForm');
-    if (kbOpen && pForm && pForm.classList.contains('editing')) sizeEditingPanel(pForm);
-    else if (!kbOpen) scheduleFit();
-  });
-  window.visualViewport.addEventListener('scroll', () => {
-    const pForm = document.getElementById('pForm');
-    if (kbOpen && pForm && pForm.classList.contains('editing')) sizeEditingPanel(pForm);
-  });
-}
-window.addEventListener('load', fitAll);
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(() => scheduleFit());    // refit após carregar as fontes
-}
-
-// ─── NAVEGAÇÃO POR SCROLL COM SNAP ────────────────────────────
-// Ordem do fluxo (a página inicial e o sucesso são tratados à parte).
-// Um painel bloqueado está com display:none → não é um ponto de snap,
-// logo é impossível fazer scroll até ele antes de preencher a etapa anterior.
+// Ordem do fluxo (excluindo welcome e success que têm tratamento próprio)
 const FLOW = ['pMod', 'pCal', 'pTime', 'pForm', 'pPay'];
 let prevFormValid = false;
-let suppressGuide = false;   // suspende o encaixe guiado durante scroll programático
 
 function panelEl(i) { return document.getElementById(FLOW[i]); }
 
+// Devolve a posição vertical de um painel no snap-root
+function panelTop(el) {
+  return el.offsetTop;
+}
+
+// Scroll suave até um painel
+function scrollToPanel(el) {
+  if (!el) return;
+  snapRoot.scrollTo({ top: panelTop(el), behavior: 'smooth' });
+}
+
+// Bloqueia painéis a partir do índice i (no FLOW)
 function lockFrom(i) {
   for (let k = i; k < FLOW.length; k++) {
-    panelEl(k).classList.add('locked');
-    panelEl(k).classList.remove('reveal');
+    const p = panelEl(k);
+    p.classList.add('locked');
+    p.classList.remove('reveal');
   }
 }
 
-function scrollToEl(el) {
-  // Espera o layout estabilizar (painel acabado de mostrar) antes de scrollar.
-  // Suspende o encaixe guiado para não competir com este movimento programático.
-  suppressGuide = true;
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    fitPanel(el);                       // adapta o conteúdo ao ecrã antes de mostrar
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setTimeout(() => { suppressGuide = false; }, 900);
-  }));
-}
-
+// Desbloqueia painel no índice i e faz scroll até ele
 function unlock(i) {
   const p = panelEl(i);
   p.classList.remove('locked');
   p.classList.add('reveal');
-  scrollToEl(p);
+  // aguarda o browser atualizar a visibilidade antes de scrollar
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    fitPanel(p);
+    scrollToPanel(p);
+  }));
 }
 
+// Navegar por clique na progress bar
 function goStep(n) {
   const map = { 1: 'pMod', 2: 'pCal', 3: 'pForm', 4: 'pPay' };
-  const el = document.getElementById(map[n]);
-  if (el && !el.classList.contains('locked')) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  const el  = document.getElementById(map[n]);
+  if (el && !el.classList.contains('locked')) scrollToPanel(el);
 }
 
 // ─── INDICADOR DE PROGRESSO ───────────────────────────────────
 function setActiveStep(n) {
-  [1, 2, 3, 4].forEach(i => {
+  [1,2,3,4].forEach(i => {
     const s = document.getElementById('s' + i);
     if (!s) return;
-    s.classList.remove('active', 'done');
-    if (i < n)        s.classList.add('done');
+    s.classList.remove('active','done');
+    if (i < n) s.classList.add('done');
     else if (i === n) s.classList.add('active');
   });
   const fill = document.getElementById('progressFill');
-  if (fill) fill.style.width = ((n - 1) / 3 * 100) + '%';
+  if (fill) fill.style.width = ((n-1)/3*100) + '%';
 }
 
 function setAllDone() {
-  [1, 2, 3, 4].forEach(i => {
+  [1,2,3,4].forEach(i => {
     const s = document.getElementById('s' + i);
     if (s) { s.classList.remove('active'); s.classList.add('done'); }
   });
@@ -1156,84 +718,218 @@ function setAllDone() {
   if (fill) fill.style.width = '100%';
 }
 
-// ─── BARRA DE PROGRESSO (fade-in) ─────────────────────────────
-// O SNAP é 100% nativo (CSS scroll-snap-type: y mandatory): exato e
-// definitivo para cima e para baixo. Aqui NÃO há encaixe em JavaScript
-// — qualquer scrollIntoView programático a competir com o snap nativo
-// provocava o jitter ao voltar para trás e para a frente.
-//
-// Este handler faz apenas duas coisas, e nunca mexe na posição do scroll:
-//  • mostra a barra de progresso (fade) assim que se sai do topo;
-//  • quando o scroll PARA, se ficámos nos DADOS volta a trancar o
-//    pagamento (só o botão "Continuar" o reabre). Como já estamos
-//    encaixados no painel, trancar o seguinte não provoca salto.
-function setupScrollGuide() {
-  const progressEl = document.getElementById('progress');
-  let ticking = false;
-  let idle;
+// ─── BARRA DE PROGRESSO: fade conforme scroll ─────────────────
+function setBarHeight() {
+  const bar = document.getElementById('progress');
+  const h   = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
+  document.documentElement.style.setProperty('--bar-h', h + 'px');
+}
 
-  // Painel visível cujo topo está mais próximo da posição de scroll
-  function nearestPanel(y) {
-    let best = null, bestDist = Infinity;
-    document.querySelectorAll('.panel').forEach(p => {
-      if (p.classList.contains('locked')) return;
-      const d = Math.abs(p.offsetTop - y);
-      if (d < bestDist) { bestDist = d; best = p; }
-    });
-    return best;
-  }
+snapRoot.addEventListener('scroll', () => {
+  const y = snapRoot.scrollTop;
+  document.getElementById('progress').classList.toggle('visible', y > 8);
 
-  // Corre só quando o scroll estabiliza (não durante o movimento)
-  function settle() {
-    if (suppressGuide) return;                                 // navegação programática em curso
-    if (document.documentElement.classList.contains('kb-open')) return;
-    const p = nearestPanel(window.scrollY || window.pageYOffset || 0);
-    if (p && p.id === 'pForm') {
-      const pay = document.getElementById('pPay');
-      if (pay && !pay.classList.contains('locked')) {
-        pay.classList.add('locked'); pay.classList.remove('reveal');
-      }
+  // Detecta qual painel está visível e actualiza step
+  const vh = snapRoot.clientHeight;
+  document.querySelectorAll('.panel').forEach(p => {
+    if (p.classList.contains('locked')) return;
+    const rel = p.offsetTop - y;
+    if (rel > -vh * 0.5 && rel < vh * 0.5) {
+      const n = parseInt(p.dataset.step);
+      if (n) setActiveStep(n);
     }
+  });
+}, { passive: true });
+
+// ─── AUTO-REDIMENSIONAMENTO ───────────────────────────────────
+const FIT_MIN = 0.6;
+
+function fitPanel(panel) {
+  if (!panel || panel.classList.contains('locked')) return;
+  const target = panel.querySelector('.block') || panel.querySelector('.welcome-inner');
+  if (!target) return;
+  if (kbOpen && panel.id === 'pForm') return;
+
+  target.style.transform = '';
+  target.style.marginTop = '';
+  target.style.marginBottom = '';
+  panel.classList.remove('scrollable');
+
+  const cs  = getComputedStyle(panel);
+  const padT = parseFloat(cs.paddingTop)    || 0;
+  const padB = parseFloat(cs.paddingBottom) || 0;
+  const avail   = panel.clientHeight - padT - padB - 2;
+  const natural = target.getBoundingClientRect().height;
+
+  if (avail <= 0 || natural <= avail) return;
+  const scale = avail / natural;
+  if (scale < FIT_MIN) {
+    panel.classList.add('scrollable');
+  } else {
+    target.style.transform = 'scale(' + scale.toFixed(4) + ')';
+    const half = (natural * (1 - scale) / 2).toFixed(2);
+    target.style.marginTop    = '-' + half + 'px';
+    target.style.marginBottom = '-' + half + 'px';
   }
-
-  function onScroll() {
-    ticking = false;
-    const y = window.scrollY || window.pageYOffset || 0;
-    if (progressEl) progressEl.classList.toggle('visible', y > 8);   // só fade da barra
-    clearTimeout(idle);
-    idle = setTimeout(settle, 160);                                  // age apenas ao parar
-  }
-
-  window.addEventListener('scroll', () => {
-    if (!ticking) { ticking = true; requestAnimationFrame(onScroll); }
-  }, { passive: true });
-
-  onScroll();   // estado inicial correto
 }
 
-function setupObserver() {
-  // Observer dos painéis de etapas: atualiza apenas o passo ativo na barra.
-  // NÃO chamamos fitPanel aqui — recalcular o layout durante o scroll movia
-  // os pontos de snap e causava jitter. O ajuste ao ecrã é feito no arranque
-  // (fitAll), em resize/orientação e sempre que o conteúdo muda (scheduleFit).
-  const stepIO = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting && e.intersectionRatio >= 0.4) {
-        const n = parseInt(e.target.dataset.step);
-        if (n) setActiveStep(n);
-      }
+function fitAll() {
+  setBarHeight();
+  document.querySelectorAll('.panel').forEach(fitPanel);
+}
+
+let fitScheduled = false;
+function scheduleFit() {
+  if (fitScheduled) return;
+  fitScheduled = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => { fitScheduled = false; fitAll(); }));
+}
+
+window.addEventListener('resize', scheduleFit);
+window.addEventListener('orientationchange', () => setTimeout(fitAll, 300));
+window.addEventListener('load', fitAll);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(scheduleFit);
+
+// ═══════════════════════════════════════════════════════════════
+//  TECLADO VIRTUAL — FORM OVERLAY
+//
+//  Quando o utilizador foca um input no pForm, mostramos um overlay
+//  fixo (z-index:60) com o mesmo bloco do formulário.
+//  O snap-root não é tocado — não há conflito.
+//  O overlay fecha ao fazer blur no último campo ou ao clicar "Continuar".
+// ═══════════════════════════════════════════════════════════════
+
+let kbOpen = false;
+
+// Cria o overlay uma vez
+let formOverlay = null;
+function ensureOverlay() {
+  if (formOverlay) return;
+  formOverlay = document.createElement('div');
+  formOverlay.id = 'form-overlay';
+  // Estilos inline (já definidos em CSS via #form-overlay)
+  document.body.appendChild(formOverlay);
+}
+
+function openFormOverlay() {
+  ensureOverlay();
+  if (formOverlay.classList.contains('active')) return;
+
+  // Copia o bloco do formulário para o overlay
+  const origBlock = document.getElementById('formBlock');
+  if (!origBlock) return;
+
+  formOverlay.innerHTML = '';
+  const clone = origBlock.cloneNode(true);
+
+  // Re-liga eventos aos inputs clonados lendo valores dos originais
+  const fields = ['fName','fPhone','fEmail','fNotes'];
+  fields.forEach(id => {
+    const orig   = document.getElementById(id);
+    const cloned = clone.querySelector('#' + id);
+    if (!orig || !cloned) return;
+    cloned.value = orig.value;
+    cloned.addEventListener('input', () => {
+      orig.value = cloned.value;
+      validateForm();
     });
-  }, { threshold: [0.4] });
-  FLOW.forEach(id => stepIO.observe(document.getElementById(id)));
+  });
+
+  // Botão continuar clonado
+  const cloneBtn = clone.querySelector('#btnContinue');
+  if (cloneBtn) {
+    cloneBtn.disabled = document.getElementById('btnContinue').disabled;
+    cloneBtn.addEventListener('click', continueToPayment);
+  }
+
+  formOverlay.appendChild(clone);
+  formOverlay.classList.add('active');
+
+  // Ajusta altura ao visualViewport (teclado)
+  sizeOverlay();
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', sizeOverlay);
+    window.visualViewport.addEventListener('scroll', sizeOverlay);
+  }
 }
 
-// ─── ETAPA 1: MODALIDADE → vai para o calendário ──────────────
-function selectMod(el) {
-  if (el.dataset.mod === state.mod) {
-    // Mesma modalidade: apenas reabre o calendário
-    unlock(1);
-    return;
+function sizeOverlay() {
+  if (!formOverlay || !formOverlay.classList.contains('active')) return;
+  const vv = window.visualViewport;
+  if (vv) {
+    formOverlay.style.top    = (vv.offsetTop  || 0) + 'px';
+    formOverlay.style.height = vv.height + 'px';
   }
+}
+
+function closeFormOverlay() {
+  if (!formOverlay) return;
+  if (window.visualViewport) {
+    window.visualViewport.removeEventListener('resize', sizeOverlay);
+    window.visualViewport.removeEventListener('scroll', sizeOverlay);
+  }
+  formOverlay.classList.remove('active');
+  formOverlay.innerHTML = '';
+  // Sincroniza valores de volta aos originais (já feito no input, mas por segurança)
+  formIsValid();
+}
+
+// Detecta focus em inputs do pForm
+document.addEventListener('focusin', (e) => {
+  const panel = e.target.closest('.panel');
+  if (!panel || panel.id !== 'pForm') return;
+  if (!(e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+  kbOpen = true;
+  openFormOverlay();
+
+  // Foca o campo equivalente no overlay
+  const id      = e.target.id;
+  const cloned  = formOverlay ? formOverlay.querySelector('#' + id) : null;
+  if (cloned) {
+    setTimeout(() => {
+      try { cloned.focus(); cloned.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch(_) {}
+    }, 50);
+  }
+  if (panel.id === 'pForm') { lockFrom(4); validateForm(); }
+}, true);
+
+// Fechar overlay quando não há campos activos
+document.addEventListener('focusout', (e) => {
+  setTimeout(() => {
+    const active = document.activeElement;
+    const inOverlay = formOverlay && formOverlay.contains(active);
+    const inForm    = document.getElementById('pForm') && document.getElementById('pForm').contains(active);
+    if (inOverlay || inForm) return;
+    kbOpen = false;
+    closeFormOverlay();
+    fitAll();
+    // Reposiciona o snap-root no pForm
+    const pf = document.getElementById('pForm');
+    if (pf && !pf.classList.contains('locked')) {
+      setTimeout(() => scrollToPanel(pf), 100);
+    }
+  }, 200);
+}, true);
+
+// Fecha overlay e blur forçado (usado antes de navegar)
+function exitEditingNow() {
+  kbOpen = false;
+  const a = document.activeElement;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) try { a.blur(); } catch(_) {}
+  closeFormOverlay();
+}
+
+// Sincroniza o estado do botão "Continuar" no overlay
+function syncOverlayBtn() {
+  if (!formOverlay) return;
+  const cloneBtn = formOverlay.querySelector('#btnContinue');
+  if (cloneBtn) cloneBtn.disabled = document.getElementById('btnContinue').disabled;
+}
+
+// ─── ETAPA 1: MODALIDADE ──────────────────────────────────────
+function selectMod(el) {
+  if (el.dataset.mod === state.mod) { unlock(1); return; }
   document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('selected'));
   el.classList.add('selected');
   state.mod        = el.dataset.mod;
@@ -1241,13 +937,10 @@ function selectMod(el) {
   state.modPrice   = parseInt(el.dataset.price);
   state.modDeposit = parseInt(el.dataset.deposit);
   state.modDur     = parseInt(el.dataset.dur);
-
-  // Nova modalidade → reinicia data/hora e bloqueia etapas seguintes
   state.date = null; state.slot = null;
   prevFormValid = false;
   lockFrom(2);
-
-  unlock(1); // mostra + scroll para o calendário
+  unlock(1);
   fetchMonthBooked(state.calYear, state.calMonth).then(renderCalendar);
 }
 
@@ -1260,294 +953,180 @@ function renderCalendar() {
   document.getElementById('calMonthLabel').textContent = ptMonths[m] + ' ' + y;
   const grid = document.getElementById('calGrid');
   grid.innerHTML = '';
+  ptDays.forEach(d => { const el = document.createElement('div'); el.className='cal-weekday'; el.textContent=d; grid.appendChild(el); });
 
-  ptDays.forEach(d => {
-    const el = document.createElement('div');
-    el.className = 'cal-weekday';
-    el.textContent = d;
-    grid.appendChild(el);
-  });
+  const firstDay    = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  for (let i=0; i<firstDay; i++) { const el=document.createElement('div'); el.className='cal-day empty'; grid.appendChild(el); }
 
-  const firstDay    = new Date(y, m, 1).getDay();
-  const daysInMonth = new Date(y, m + 1, 0).getDate();
-
-  for (let i = 0; i < firstDay; i++) {
-    const el = document.createElement('div');
-    el.className = 'cal-day empty';
-    grid.appendChild(el);
-  }
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const el   = document.createElement('div');
-    el.className = 'cal-day';
-    el.textContent = d;
-
-    const date = new Date(y, m, d);
-    const dow  = date.getDay();
-
-    if (date < today || dow === 0 || dow === 6) {
-      el.classList.add(dow === 0 || dow === 6 ? 'weekend' : 'past');
+  for (let d=1; d<=daysInMonth; d++) {
+    const el=document.createElement('div'); el.className='cal-day'; el.textContent=d;
+    const date=new Date(y,m,d); const dow=date.getDay();
+    if (date<today||dow===0||dow===6) {
+      el.classList.add(dow===0||dow===6?'weekend':'past');
     } else {
-      const dateStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const booked  = bookedCache[dateStr] || [];
-      const available = getAvailableSlotsForDay(dateStr, booked);
-      const monthLoaded = monthCache[`${y}-${String(m + 1).padStart(2, '0')}`];
-
-      if (monthLoaded && available.length === 0) {
-        el.classList.add('fully-booked');
-        el.title = 'Dia completo — sem horários disponíveis';
-      } else if (monthLoaded && booked.length > 0 && available.length > 0) {
-        el.classList.add('partial-booked');
-        el.title = `${available.length} horário(s) disponível(eis)`;
-        if (state.date === dateStr) el.classList.add('selected-day');
-        el.onclick = () => selectDay(dateStr, el);
+      const dateStr=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const booked=bookedCache[dateStr]||[];
+      const available=getAvailableSlotsForDay(dateStr,booked);
+      const monthLoaded=monthCache[`${y}-${String(m+1).padStart(2,'0')}`];
+      if (monthLoaded&&available.length===0) { el.classList.add('fully-booked'); el.title='Dia completo'; }
+      else if (monthLoaded&&booked.length>0&&available.length>0) {
+        el.classList.add('partial-booked'); el.title=`${available.length} horário(s) disponível(eis)`;
+        if (state.date===dateStr) el.classList.add('selected-day');
+        el.onclick=()=>selectDay(dateStr,el);
       } else {
         el.classList.add('available');
-        if (state.date === dateStr) el.classList.add('selected-day');
-        el.onclick = () => selectDay(dateStr, el);
+        if (state.date===dateStr) el.classList.add('selected-day');
+        el.onclick=()=>selectDay(dateStr,el);
       }
     }
     grid.appendChild(el);
   }
-  scheduleFit();   // calendário pode mudar de altura → reajusta ao ecrã
+  scheduleFit();
 }
 
-// Converte bookedHours (inteiros de hora) em Set de minutos ocupados
 function bookedMinutesSet(bookedHours) {
-  const set = new Set();
-  bookedHours.forEach(h => {
-    for (let m = 0; m < 60; m++) set.add(h * 60 + m);
-  });
-  return set;
+  const set=new Set(); bookedHours.forEach(h=>{ for(let m=0;m<60;m++) set.add(h*60+m); }); return set;
 }
+function minsToLabel(mins) { const h=Math.floor(mins/60)%24,m=mins%60; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
 
-function minsToLabel(mins) {
-  const h = Math.floor(mins / 60) % 24;
-  const m = mins % 60;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-}
-
-function getAvailableSlotsForDay(dateStr, bookedHours) {
-  const durMins   = (state.modDur || 1) * 60;
-  const startMins = SCHEDULE_START * 60;
-  const endLimit  = MAX_END_HOUR * 60;
-  const occupied  = bookedMinutesSet(bookedHours);
-  const available = [];
-
-  for (let t = startMins; t < endLimit; t += 30) {
-    if (t + durMins > endLimit) continue;
-    let blocked = false;
-    for (let m = t; m < t + durMins; m++) {
-      if (occupied.has(m)) { blocked = true; break; }
-    }
-    // Buffer: minuto anterior ocupado → esta slot está em período de buffer
-    if (!blocked && t > 0 && occupied.has(t - 1)) blocked = true;
+function getAvailableSlotsForDay(dateStr,bookedHours) {
+  const durMins=((state.modDur||1)*60),startMins=SCHEDULE_START*60,endLimit=MAX_END_HOUR*60;
+  const occupied=bookedMinutesSet(bookedHours),available=[];
+  for (let t=startMins;t<endLimit;t+=30) {
+    if (t+durMins>endLimit) continue;
+    let blocked=false;
+    for (let m=t;m<t+durMins;m++) { if(occupied.has(m)){blocked=true;break;} }
+    if (!blocked&&t>0&&occupied.has(t-1)) blocked=true;
     if (!blocked) available.push(t);
   }
   return available;
 }
 
-// Escolher data → vai para o horário
-function selectDay(dateStr, el) {
-  document.querySelectorAll('.cal-day').forEach(c => c.classList.remove('selected-day'));
+function selectDay(dateStr,el) {
+  document.querySelectorAll('.cal-day').forEach(c=>c.classList.remove('selected-day'));
   el.classList.add('selected-day');
-  state.date = dateStr;
-  state.slot = null;
-  prevFormValid = false;
-  lockFrom(3); // bloqueia dados e pagamento
-
-  // Cabeçalho com a data escolhida no painel do horário
-  const d = new Date(dateStr + 'T12:00:00');
-  document.getElementById('slotDate').textContent =
-    d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
-
-  unlock(2); // mostra + scroll para os horários
+  state.date=dateStr; state.slot=null; prevFormValid=false; lockFrom(3);
+  const d=new Date(dateStr+'T12:00:00');
+  document.getElementById('slotDate').textContent=d.toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'});
+  unlock(2);
   fetchAndRenderSlots(dateStr);
 }
 
 async function changeMonth(dir) {
-  state.calMonth += dir;
-  if (state.calMonth > 11) { state.calMonth = 0; state.calYear++; }
-  if (state.calMonth < 0)  { state.calMonth = 11; state.calYear--; }
-  await fetchMonthBooked(state.calYear, state.calMonth);
+  state.calMonth+=dir;
+  if (state.calMonth>11){state.calMonth=0;state.calYear++;}
+  if (state.calMonth<0) {state.calMonth=11;state.calYear--;}
+  await fetchMonthBooked(state.calYear,state.calMonth);
   renderCalendar();
 }
 
-// ─── PRÉ-CARREGA DIAS OCUPADOS DO MÊS ────────────────────────
-async function fetchMonthBooked(year, month) {
-  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+async function fetchMonthBooked(year,month) {
+  const monthKey=`${year}-${String(month+1).padStart(2,'0')}`;
   if (monthCache[monthKey]) return;
-
-  const grid = document.getElementById('calGrid');
-  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:1.5rem;font-family:\'DM Mono\',monospace;font-size:0.65rem;color:var(--warm);letter-spacing:0.1em">A verificar disponibilidade...</div>';
-
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:1.5rem;font-family:\'DM Mono\',monospace;font-size:0.65rem;color:var(--warm);letter-spacing:0.1em">A verificar disponibilidade...</div>';
   try {
-    const url = `${APPS_SCRIPT_URL}?action=getBookedMonth&year=${year}&month=${month + 1}`;
-    const res  = await fetch(url, { redirect: 'follow' });
-    const data = await res.json();
-    if (data.days) {
-      Object.keys(data.days).forEach(dateStr => { bookedCache[dateStr] = data.days[dateStr]; });
-    }
-  } catch (e) {
-    console.warn('Não foi possível carregar dados do mês:', e);
-  }
-
-  monthCache[monthKey] = true;
+    const url=`${APPS_SCRIPT_URL}?action=getBookedMonth&year=${year}&month=${month+1}`;
+    const res=await fetch(url,{redirect:'follow'}); const data=await res.json();
+    if (data.days) Object.keys(data.days).forEach(dateStr=>{ bookedCache[dateStr]=data.days[dateStr]; });
+  } catch(e) { console.warn('Não foi possível carregar dados do mês:',e); }
+  monthCache[monthKey]=true;
 }
 
-// ─── FETCH SLOTS DE UM DIA ────────────────────────────────────
 async function fetchAndRenderSlots(dateStr) {
-  const container = document.getElementById('slotsContainer');
-  container.innerHTML = '<div class="slots-loading">A verificar disponibilidade</div>';
-  document.getElementById('slotsNote').textContent = '';
-
-  if (bookedCache[dateStr] !== undefined) {
-    renderSlots(dateStr, bookedCache[dateStr]);
-    return;
-  }
-
+  const container=document.getElementById('slotsContainer');
+  container.innerHTML='<div class="slots-loading">A verificar disponibilidade</div>';
+  document.getElementById('slotsNote').textContent='';
+  if (bookedCache[dateStr]!==undefined) { renderSlots(dateStr,bookedCache[dateStr]); return; }
   try {
-    const url  = `${APPS_SCRIPT_URL}?action=getBooked&date=${dateStr}`;
-    const res  = await fetch(url, { redirect: 'follow' });
-    const data = await res.json();
-    bookedCache[dateStr] = data.bookedHours || [];
-  } catch (e) {
-    console.warn('Não foi possível carregar slots, a mostrar todos como disponíveis:', e);
-    bookedCache[dateStr] = [];
-  }
-
-  renderSlots(dateStr, bookedCache[dateStr]);
+    const url=`${APPS_SCRIPT_URL}?action=getBooked&date=${dateStr}`;
+    const res=await fetch(url,{redirect:'follow'}); const data=await res.json();
+    bookedCache[dateStr]=data.bookedHours||[];
+  } catch(e) { console.warn('Slots indisponíveis, a mostrar todos como livres:',e); bookedCache[dateStr]=[]; }
+  renderSlots(dateStr,bookedCache[dateStr]);
   renderCalendar();
 }
 
-// ─── RENDERIZAR SLOTS ─────────────────────────────────────────
-// Slots de 30 em 30 minutos (9:00, 9:30, 10:00 … 23:30).
-// bookedHours: array de horas inteiras ocupadas do backend.
-// Buffer de 15min: se o minuto imediatamente anterior ao slot estiver ocupado
-// (sessão acabou mesmo antes), o slot fica desativado por buffer.
+function renderSlots(dateStr,bookedHours) {
+  const container=document.getElementById('slotsContainer');
+  container.innerHTML='<div class="slots" id="slotsGrid"></div>';
+  const grid=document.getElementById('slotsGrid');
+  const durMins=(state.modDur||1)*60,startMins=SCHEDULE_START*60,endLimit=MAX_END_HOUR*60;
+  const occupied=bookedMinutesSet(bookedHours);
 
-function renderSlots(dateStr, bookedHours) {
-  const container = document.getElementById('slotsContainer');
-  container.innerHTML = '<div class="slots" id="slotsGrid"></div>';
-  const grid = document.getElementById('slotsGrid');
-
-  const durMins   = (state.modDur || 1) * 60;
-  const startMins = SCHEDULE_START * 60;
-  const endLimit  = MAX_END_HOUR * 60;
-  const occupied  = bookedMinutesSet(bookedHours);
-
-  for (let t = startMins; t < endLimit; t += 30) {
-    const label = minsToLabel(t);
-    const el    = document.createElement('div');
-    el.textContent = label;
-
-    if (t + durMins > endLimit) {
-      el.className = 'slot disabled-slot';
-      el.title = `Terminaria às ${minsToLabel((t + durMins) % (24*60))} — excede a meia-noite`;
-    } else {
-      let isBooked = false;
-      for (let m = t; m < t + durMins; m++) {
-        if (occupied.has(m)) { isBooked = true; break; }
-      }
-      const hasBuffer = !isBooked && t > 0 && occupied.has(t - 1);
-
-      if (isBooked) {
-        el.className = 'slot booked-slot';
-        el.title = 'Horário ocupado';
-      } else if (hasBuffer) {
-        el.className = 'slot disabled-slot';
-        el.title = 'Buffer de 15min após sessão anterior';
-      } else {
-        el.className = 'slot';
-        if (state.slot === label) el.classList.add('selected-slot');
-        el.onclick = () => selectSlot(label, el);
-      }
+  for (let t=startMins;t<endLimit;t+=30) {
+    const label=minsToLabel(t); const el=document.createElement('div'); el.textContent=label;
+    if (t+durMins>endLimit) { el.className='slot disabled-slot'; el.title=`Terminaria às ${minsToLabel((t+durMins)%(24*60))} — excede a meia-noite`; }
+    else {
+      let isBooked=false;
+      for (let m=t;m<t+durMins;m++) { if(occupied.has(m)){isBooked=true;break;} }
+      const hasBuffer=!isBooked&&t>0&&occupied.has(t-1);
+      if (isBooked)     { el.className='slot booked-slot'; el.title='Horário ocupado'; }
+      else if(hasBuffer){ el.className='slot disabled-slot'; el.title='Buffer de 15min'; }
+      else { el.className='slot'; if(state.slot===label) el.classList.add('selected-slot'); el.onclick=()=>selectSlot(label,el); }
     }
     grid.appendChild(el);
   }
-
-  // (nota informativa removida)
-  document.getElementById('slotsNote').textContent = '';
-  scheduleFit();   // a grelha de horários pode ser alta → reajusta ao ecrã
+  document.getElementById('slotsNote').textContent='';
+  scheduleFit();
 }
 
-// Escolher horário → vai para os dados
-function selectSlot(label, el) {
-  document.querySelectorAll('.slot').forEach(s => s.classList.remove('selected-slot'));
-  el.classList.add('selected-slot');
-  state.slot = label;
-
-  lockFrom(4); // o pagamento só reabre ao clicar em "Continuar"
-  unlock(3);   // mostra + scroll para os dados
-  validateForm(); // acerta o estado do botão "Continuar" conforme os dados existentes
+function selectSlot(label,el) {
+  document.querySelectorAll('.slot').forEach(s=>s.classList.remove('selected-slot'));
+  el.classList.add('selected-slot'); state.slot=label;
+  lockFrom(4); unlock(3); validateForm();
 }
 
 // ─── ETAPA 3: FORMULÁRIO ──────────────────────────────────────
-// Telemóvel: aceita formato nacional (9XXXXXXXX) e também com indicativo do
-// país (+351…, 00351…) ou outro indicativo internacional em formato E.164,
-// porque há quem tenha o contacto gravado com indicativo.
-function cleanPhone(raw) {
-  return (raw || '').trim().replace(/[\s().\-]/g, '');
-}
+function cleanPhone(raw) { return (raw||'').trim().replace(/[\s().\-]/g,''); }
 function isValidPhone(raw) {
-  let s = cleanPhone(raw);
-  if (s.indexOf('00') === 0) s = '+' + s.slice(2);          // 00xxx → +xxx
-  let national = s;
-  if (national.indexOf('+351') === 0)      national = national.slice(4);   // +351
-  else if (/^351\d{9}$/.test(national))    national = national.slice(3);   // 351 sem +
-  if (/^9\d{8}$/.test(national)) return true;               // móvel PT (9 dígitos)
-  if (/^\+\d{8,15}$/.test(s))    return true;               // internacional E.164
+  let s=cleanPhone(raw);
+  if(s.indexOf('00')===0) s='+'+s.slice(2);
+  let national=s;
+  if(national.indexOf('+351')===0) national=national.slice(4);
+  else if(/^351\d{9}$/.test(national)) national=national.slice(3);
+  if(/^9\d{8}$/.test(national)) return true;
+  if(/^\+\d{8,15}$/.test(s)) return true;
   return false;
 }
-
 function formIsValid() {
-  const name  = document.getElementById('fName').value.trim();
-  const phone = document.getElementById('fPhone').value.trim();
-  const email = document.getElementById('fEmail').value.trim();
-  state.name  = name; state.phone = phone; state.email = email;
-  state.notes = document.getElementById('fNotes').value.trim();
-  return name.length > 1 && isValidPhone(phone) && /\S+@\S+\.\S+/.test(email);
+  const name=document.getElementById('fName').value.trim();
+  const phone=document.getElementById('fPhone').value.trim();
+  const email=document.getElementById('fEmail').value.trim();
+  state.name=name; state.phone=phone; state.email=email;
+  state.notes=document.getElementById('fNotes').value.trim();
+  return name.length>1&&isValidPhone(phone)&&/\S+@\S+\.\S+/.test(email);
 }
-
-let formTimer = null;
+let formTimer=null;
 function validateForm() {
-  const ok = formIsValid();
-  // O pagamento NUNCA é desbloqueado aqui — só o botão "Continuar" o faz.
-  // Se os dados ficarem inválidos, garante o pagamento bloqueado.
+  const ok=formIsValid();
   if (!ok) lockFrom(4);
   clearTimeout(formTimer);
-  prevFormValid = ok;
-  const b = document.getElementById("btnContinue"); if (b) b.disabled = !ok;
+  prevFormValid=ok;
+  const b=document.getElementById('btnContinue'); if(b) b.disabled=!ok;
+  syncOverlayBtn();
 }
 
 // ─── ETAPA 4: RESUMO ──────────────────────────────────────────
-function isLateSubmission() { return new Date().getHours() >= 20; }
-
+function isLateSubmission() { return new Date().getHours()>=20; }
 function nextBusinessDay() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  while (d.getDay() === 0 || d.getDay() === 6) d.setDate(d.getDate() + 1);
-  return d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+  const d=new Date(); d.setDate(d.getDate()+1);
+  while(d.getDay()===0||d.getDay()===6) d.setDate(d.getDate()+1);
+  return d.toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long'});
 }
 
 function renderSummary() {
-  if (!state.date || !state.slot) return;
-  const d         = new Date(state.date + 'T12:00:00');
-  const dateLabel = d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  if (!state.date||!state.slot) return;
+  const d=new Date(state.date+'T12:00:00');
+  const dateLabel=d.toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const [startHStr,startMStr]=state.slot.split(':');
+  const startH=parseInt(startHStr),startMins=parseInt(startMStr)||0;
+  const endTotal=startH*60+startMins+state.modDur*60;
+  const endLabel=`${String(Math.floor(endTotal/60)%24).padStart(2,'0')}:${String(endTotal%60).padStart(2,'0')}`;
+  const isFullPay=state.modDeposit===state.modPrice,remaining=state.modPrice-state.modDeposit;
 
-  // Suporte para slots com buffer (ex: "14:15" → startH=14, mins=15)
-  const [startHStr, startMStr] = state.slot.split(':');
-  const startH   = parseInt(startHStr);
-  const startMins = parseInt(startMStr) || 0;
-  const endTotalMins = startH * 60 + startMins + state.modDur * 60;
-  const endH   = String(Math.floor(endTotalMins / 60) % 24).padStart(2, '0');
-  const endM   = String(endTotalMins % 60).padStart(2, '0');
-  const endLabel = `${endH}:${endM}`;
-
-  const isFullPay = state.modDeposit === state.modPrice;
-  const remaining = state.modPrice - state.modDeposit;
-
-  document.getElementById('summaryContent').innerHTML = `
+  document.getElementById('summaryContent').innerHTML=`
     <div class="summary-row"><span>Modalidade</span><span>${state.modLabel}</span></div>
     <div class="summary-row"><span>Duração</span><span>${state.modDur}h</span></div>
     <div class="summary-row"><span>Data</span><span>${dateLabel}</span></div>
@@ -1555,160 +1134,83 @@ function renderSummary() {
     <div class="summary-row"><span>Nome</span><span>${state.name}</span></div>
     <div class="summary-row"><span>Telemóvel</span><span>${state.phone}</span></div>
     <div class="summary-row"><span>Email</span><span>${state.email}</span></div>
-    <div class="total-row"><span>Total da sessão</span><span class="price">${state.modPrice}€</span></div>
-  `;
+    <div class="total-row"><span>Total da sessão</span><span class="price">${state.modPrice}€</span></div>`;
 
-  document.getElementById('depositInfo').textContent = isFullPay
-    ? `✦  Envie ${state.modDeposit}€ (pagamento integral) via MBWay para confirmar a reserva.`
-    : `✦  Envie ${state.modDeposit}€ (sinal de 50%) via MBWay para confirmar a reserva.\n   Os restantes ${remaining}€ são liquidados no dia da sessão.`;
+  document.getElementById('depositInfo').textContent=isFullPay
+    ?`✦  Envie ${state.modDeposit}€ (pagamento integral) via MBWay para confirmar a reserva.`
+    :`✦  Envie ${state.modDeposit}€ (sinal de 50%) via MBWay para confirmar a reserva.\n   Os restantes ${remaining}€ são liquidados no dia da sessão.`;
+  document.getElementById('mbwayAmt').textContent=state.modDeposit+'€';
 
-  document.getElementById('mbwayAmt').textContent = state.modDeposit + '€';
-
-  const lateAlert = document.getElementById('lateAlert');
-  if (isLateSubmission()) {
-    lateAlert.classList.add('urgent');
-    lateAlert.textContent = '⏱ Está a submeter após as 20h. O pagamento será validado às 9h de ' + nextBusinessDay() + ' e receberá a confirmação da marcação nesse momento.';
-  } else {
-    lateAlert.classList.remove('urgent');
-    lateAlert.textContent = 'ℹ Pagamentos submetidos após as 20h são validados no próximo dia útil às 9h. A confirmação da marcação é enviada nesse momento.';
-  }
-  scheduleFit();   // resumo + MBWay + alerta é o painel mais alto → reajusta ao ecrã
+  const lateAlert=document.getElementById('lateAlert');
+  if (isLateSubmission()) { lateAlert.classList.add('urgent'); lateAlert.textContent='⏱ Está a submeter após as 20h. O pagamento será validado às 9h de '+nextBusinessDay()+' e receberá a confirmação da marcação nesse momento.'; }
+  else { lateAlert.classList.remove('urgent'); lateAlert.textContent='ℹ Pagamentos submetidos após as 20h são validados no próximo dia útil às 9h. A confirmação da marcação é enviada nesse momento.'; }
+  scheduleFit();
 }
 
 function copyPhone() {
-  const num = MBWAY_PHONE.replace(/\s/g, '');
-  const done = () => {
-    const n = document.getElementById('copyNote');
-    if (!n) return;
-    n.textContent = '✓ copiado!';
-    setTimeout(() => { n.textContent = 'toque para copiar'; }, 2000);
-  };
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(num).then(done).catch(() => fallbackCopy(num, done));
-  } else {
-    fallbackCopy(num, done);
-  }
+  const num=MBWAY_PHONE.replace(/\s/g,'');
+  const done=()=>{ const n=document.getElementById('copyNote'); if(!n)return; n.textContent='✓ copiado!'; setTimeout(()=>{n.textContent='toque para copiar';},2000); };
+  if (navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(num).then(done).catch(()=>fallbackCopy(num,done));
+  else fallbackCopy(num,done);
 }
-
-function fallbackCopy(text, cb) {
-  const ta = document.createElement('textarea');
-  ta.value = text;
-  ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.opacity = '0';
-  document.body.appendChild(ta); ta.focus(); ta.select();
-  try { document.execCommand('copy'); } catch (_) {}
-  document.body.removeChild(ta);
-  if (cb) cb();
+function fallbackCopy(text,cb) {
+  const ta=document.createElement('textarea'); ta.value=text; ta.style.cssText='position:fixed;top:0;opacity:0'; document.body.appendChild(ta); ta.focus(); ta.select();
+  try{document.execCommand('copy');}catch(_){}
+  document.body.removeChild(ta); if(cb)cb();
 }
 
 // ─── SUBMETER MARCAÇÃO ────────────────────────────────────────
 async function submitBooking() {
-  const btn = document.getElementById('btnSubmit');
-  btn.disabled = true;
-  btn.textContent = 'A enviar...';
-
-  const d         = new Date(state.date + 'T12:00:00');
-  const dateLabel = d.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-  const payload = {
-    action:       'book',
-    date:         state.date,
-    slot:         state.slot,
-    duration:     state.modDur,
-    modality:     state.modLabel,
-    name:         state.name,
-    phone:        state.phone,
-    email:        state.email,
-    totalPrice:   state.modPrice,
-    deposit:      state.modDeposit,
-    notes:        state.notes || '—',
-    paymentType:  (state.modDeposit === state.modPrice ? 'Integral' : 'Sinal 50%'),
-    lateSubmission: isLateSubmission() ? 'Sim — validação às 9h de ' + nextBusinessDay() : 'Não'
-  };
-
+  const btn=document.getElementById('btnSubmit'); btn.disabled=true; btn.textContent='A enviar...';
+  const d=new Date(state.date+'T12:00:00');
+  const dateLabel=d.toLocaleDateString('pt-PT',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const payload={action:'book',date:state.date,slot:state.slot,duration:state.modDur,modality:state.modLabel,name:state.name,phone:state.phone,email:state.email,totalPrice:state.modPrice,deposit:state.modDeposit,notes:state.notes||'—',paymentType:(state.modDeposit===state.modPrice?'Integral':'Sinal 50%'),lateSubmission:isLateSubmission()?'Sim — validação às 9h de '+nextBusinessDay():'Não'};
   try {
-    await fetch(APPS_SCRIPT_URL, {
-      method:   'POST',
-      redirect: 'follow',
-      headers:  { 'Content-Type': 'text/plain;charset=utf-8' },
-      body:     JSON.stringify(payload)
-    });
+    await fetch(APPS_SCRIPT_URL,{method:'POST',redirect:'follow',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+    const [slotHStr,slotMStr]=state.slot.split(':');
+    const slotStartMins=parseInt(slotHStr)*60+(parseInt(slotMStr)||0),slotEndMins=slotStartMins+state.modDur*60;
+    if(!bookedCache[state.date]) bookedCache[state.date]=[];
+    for(let m=slotStartMins;m<slotEndMins;m+=60){const h=Math.floor(m/60);if(!bookedCache[state.date].includes(h))bookedCache[state.date].push(h);}
+  } catch(e){console.warn('Erro ao submeter:',e);}
 
-    // Actualiza o cache local com as horas ocupadas pela nova sessão
-    // Um slot de 9:30 com 2h ocupa: 9:30–11:30 → horas 9, 10, 11 (parcialmente)
-    const [slotHStr, slotMStr] = state.slot.split(':');
-    const slotStartMins = parseInt(slotHStr) * 60 + (parseInt(slotMStr) || 0);
-    const slotEndMins   = slotStartMins + state.modDur * 60;
-    if (!bookedCache[state.date]) bookedCache[state.date] = [];
-    for (let m = slotStartMins; m < slotEndMins; m += 60) {
-      const h = Math.floor(m / 60);
-      if (!bookedCache[state.date].includes(h)) bookedCache[state.date].push(h);
-    }
-  } catch (e) {
-    console.warn('Erro ao submeter:', e);
-  }
-
-  // Esconde todas as etapas e mostra o sucesso
-  FLOW.forEach(id => document.getElementById(id).classList.add('locked'));
-  const ss = document.getElementById('pSuccess');
-  ss.classList.remove('locked');
-  ss.classList.add('reveal');
+  FLOW.forEach(id=>document.getElementById(id).classList.add('locked'));
+  const ss=document.getElementById('pSuccess');
+  ss.classList.remove('locked'); ss.classList.add('reveal');
   setAllDone();
-
-  document.getElementById('successDetails').innerHTML = `
-    <div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--warm);text-align:left;line-height:2">
-      <strong style="display:block;margin-bottom:0.5rem;font-size:0.75rem;color:var(--ink)">${state.modLabel}</strong>
-      📅 ${dateLabel} · ${state.slot}<br>
-      👤 ${state.name}<br>
-      💶 Sinal: ${state.modDeposit}€ via MBWay · ${MBWAY_PHONE}
-      ${state.modDeposit < state.modPrice ? '<br>        💶 Restantes ' + (state.modPrice - state.modDeposit) + '€ no dia da sessão' : ''}
-    </div>
-  `;
-
-  scrollToEl(ss);
+  document.getElementById('successDetails').innerHTML=`<div style="font-family:'DM Mono',monospace;font-size:0.7rem;color:var(--warm);text-align:left;line-height:2"><strong style="display:block;margin-bottom:0.5rem;font-size:0.75rem;color:var(--ink)">${state.modLabel}</strong>📅 ${dateLabel} · ${state.slot}<br>👤 ${state.name}<br>💶 Sinal: ${state.modDeposit}€ via MBWay · ${MBWAY_PHONE}${state.modDeposit<state.modPrice?'<br>        💶 Restantes '+(state.modPrice-state.modDeposit)+'€ no dia da sessão':''}</div>`;
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fitPanel(ss); scrollToPanel(ss); }));
 }
 
 // ─── RESET ────────────────────────────────────────────────────
 function resetAll() {
-  state = {
-    mod: null, modLabel: null, modPrice: null, modDeposit: null, modDur: null,
-    date: null, slot: null, name: '', phone: '', email: '', notes: '',
-    calYear: today.getFullYear(), calMonth: today.getMonth()
-  };
-  prevFormValid = false;
-  document.querySelectorAll('.mod-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('fName').value  = '';
-  document.getElementById('fPhone').value = '';
-  document.getElementById('fEmail').value = '';
-  document.getElementById('fNotes').value = '';
-  document.getElementById('slotsContainer').innerHTML = '<div class="slots" id="slotsGrid"></div>';
-
-  document.getElementById('btnSubmit').disabled = false;
-  document.getElementById('btnSubmit').innerHTML = '✓ Confirmar marcação';
-
+  state={mod:null,modLabel:null,modPrice:null,modDeposit:null,modDur:null,date:null,slot:null,name:'',phone:'',email:'',notes:'',calYear:today.getFullYear(),calMonth:today.getMonth()};
+  prevFormValid=false;
+  document.querySelectorAll('.mod-card').forEach(c=>c.classList.remove('selected'));
+  ['fName','fPhone','fEmail','fNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('slotsContainer').innerHTML='<div class="slots" id="slotsGrid"></div>';
+  document.getElementById('btnSubmit').disabled=false;
+  document.getElementById('btnSubmit').innerHTML='✓ Confirmar marcação';
   document.getElementById('pSuccess').classList.add('locked');
-  lockFrom(1); // bloqueia tudo a partir do calendário (mantém só a modalidade)
-  setActiveStep(1);
-  document.getElementById('pMod').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  lockFrom(1); setActiveStep(1);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>scrollToPanel(document.getElementById('pMod'))));
 }
-
 
 function continueToPayment() {
   if (!formIsValid()) return;
-  exitEditingNow();          // fecha o teclado/edição antes de navegar
+  exitEditingNow();
   renderSummary();
-  // Único ponto que torna o pagamento acessível — apenas por ação do utilizador
-  panelEl(4).classList.remove('locked');
-  panelEl(4).classList.add('reveal');
-  scrollToEl(panelEl(4));
+  const pay=panelEl(4);
+  pay.classList.remove('locked'); pay.classList.add('reveal');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{ fitPanel(pay); scrollToPanel(pay); }));
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
 function init() {
-  lockFrom(1);            // só a página inicial e a modalidade estão acessíveis
+  // pMod começa sempre desbloqueado (1ª etapa real)
+  document.getElementById('pMod').classList.remove('locked');
+  lockFrom(1); // bloqueia a partir do índice 1 = pCal em diante
   setActiveStep(1);
-  setupObserver();
-  setupScrollGuide();     // barra fade-in + encaixe guiado das modalidades
-  fitAll();               // adapta os painéis visíveis ao ecrã desde o arranque
+  fitAll();
 }
 init();
 </script>
